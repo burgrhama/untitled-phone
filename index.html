@@ -71,7 +71,7 @@
   .auth-box {
     background: rgba(10, 10, 22, 0.85);
     backdrop-filter: blur(24px);
-    padding: 40px;
+    padding: 30px 25px;
     border-radius: 36px;
     border: 1px solid rgba(255, 255, 255, 0.08);
     width: 90%;
@@ -79,9 +79,16 @@
     box-shadow: 0 20px 40px black;
   }
 
+  @media (max-width: 480px) {
+    .auth-box {
+      padding: 25px 20px;
+      width: 95%;
+    }
+  }
+
   .auth-box h2 {
-    margin-bottom: 25px;
-    font-size: 28px;
+    margin-bottom: 20px;
+    font-size: clamp(22px, 6vw, 28px);
     font-weight: 600;
     color: #e8e0ff;
     letter-spacing: -0.5px;
@@ -89,14 +96,15 @@
 
   .auth-box input {
     width: 100%;
-    padding: 14px 16px;
+    padding: 12px 14px;
     margin-bottom: 12px;
     background: rgba(40, 40, 60, 0.8);
     border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 12px;
     color: #fff;
-    font-size: 14px;
+    font-size: clamp(13px, 3vw, 14px);
     transition: 0.2s ease;
+    box-sizing: border-box;
   }
 
   .auth-box input:focus {
@@ -108,18 +116,19 @@
 
   .auth-box button {
     width: 100%;
-    padding: 14px 16px;
+    padding: 12px 14px;
     background: rgba(200, 200, 240, 0.12);
     color: #f0f0ff;
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 12px;
     cursor: pointer;
     font-weight: 600;
-    font-size: 15px;
+    font-size: clamp(14px, 3vw, 15px);
     transition: 0.2s ease;
     backdrop-filter: blur(8px);
     margin-top: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-sizing: border-box;
   }
 
   .auth-box button:hover {
@@ -158,32 +167,37 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 30px 60px;
+    padding: 20px 20px;
     backdrop-filter: blur(2px);
+    gap: 10px;
+    flex-wrap: wrap;
   }
 
   header h1 {
-    font-size: 42px;
+    font-size: clamp(24px, 8vw, 42px);
     font-weight: 700;
     letter-spacing: -1px;
     text-shadow: 0 0 20px rgba(150,150,240,0.2);
     color: #f0f0ff;
     display: inline-block;
     cursor: pointer;
+    flex: 1;
+    min-width: 200px;
   }
 
   .btn {
     background: rgba(200,200,240,0.08);
     color: #f0f0ff;
     border: 1px solid rgba(255,255,255,0.15);
-    padding: 12px 22px;
+    padding: 10px 16px;
     font-weight: 500;
     border-radius: 40px;
     cursor: pointer;
     transition: 0.2s ease;
     backdrop-filter: blur(8px);
-    margin-left: 12px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    font-size: clamp(12px, 3vw, 14px);
+    white-space: nowrap;
   }
 
   .btn:hover {
@@ -191,6 +205,22 @@
     border-color: rgba(255,255,255,0.3);
     transform: scale(1.02);
     color: white;
+  }
+
+  @media (max-width: 768px) {
+    header {
+      padding: 15px 15px;
+      gap: 8px;
+    }
+
+    header h1 {
+      font-size: 28px;
+    }
+
+    .btn {
+      padding: 8px 12px;
+      font-size: 12px;
+    }
   }
 
   .btn-logout {
@@ -207,9 +237,26 @@
 
   .album-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, 160px);
-    gap: 25px;
-    padding: 40px 60px;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 20px;
+    padding: 20px;
+    max-width: 100%;
+  }
+
+  @media (max-width: 768px) {
+    .album-grid {
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 15px;
+      padding: 15px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .album-grid {
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 12px;
+      padding: 12px;
+    }
   }
 
   .album-card {
@@ -238,26 +285,50 @@
   }
 
   .album-card p {
-    margin-top: 14px;
+    margin-top: 10px;
     font-weight: 500;
     text-align: center;
     color: #ddd;
+    font-size: clamp(0.85rem, 2.5vw, 0.95rem);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (max-width: 480px) {
+    .album-card p {
+      font-size: 0.8rem;
+    }
   }
 
   .album-view {
     display: none;
-    padding: 30px 80px 50px 80px;
+    padding: 20px;
+    padding-bottom: 100px;
   }
 
   .album-layout {
     display: flex;
-    gap: 60px;
+    gap: 20px;
     flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  @media (max-width: 768px) {
+    .album-view {
+      padding: 15px;
+      padding-bottom: 100px;
+    }
+
+    .album-layout {
+      gap: 15px;
+      justify-content: center;
+    }
   }
 
   .cover-large {
-    width: 320px;
-    height: 320px;
+    width: clamp(180px, 50vw, 320px);
+    height: clamp(180px, 50vw, 320px);
     border-radius: 32px;
     background: #2a2a3a;
     object-fit: cover;
@@ -267,13 +338,27 @@
     border: 2px solid rgba(255,255,255,0.07);
   }
 
+  @media (max-width: 768px) {
+    .cover-large {
+      width: 200px;
+      height: 200px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .cover-large {
+      width: 160px;
+      height: 160px;
+    }
+  }
+
   .cover-large:hover {
     transform: scale(1.01);
     border-color: rgba(255,255,255,0.2);
   }
 
   .album-title {
-    font-size: 44px;
+    font-size: clamp(24px, 8vw, 44px);
     font-weight: 600;
     margin: 0 0 16px 0;
     cursor: pointer;
@@ -282,23 +367,35 @@
     transition: border 0.1s;
     color: #e4e4ff;
   }
+
+  @media (max-width: 768px) {
+    .album-title {
+      font-size: 28px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .album-title {
+      font-size: 22px;
+    }
+  }
   .album-title:hover { border-bottom: 2px solid rgba(190,180,250,0.35); }
 
   /* TRACK LIST – draggable items */
   .track-list {
     margin-top: 20px;
-    max-height: 400px;
+    max-height: 500px;
     overflow-y: auto;
     padding-right: 10px;
   }
 
   .track {
-    padding: 16px 18px;
+    padding: 14px 16px;
     border-bottom: 1px solid rgba(255,255,255,0.05);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 1.1rem;
+    font-size: clamp(0.95rem, 2.5vw, 1.1rem);
     background: rgba(15,15,25,0.3);
     border-radius: 16px;
     margin-bottom: 6px;
@@ -307,6 +404,13 @@
     transition: background 0.1s, transform 0.1s;
     border: 1px solid transparent;
     user-select: none;
+  }
+
+  @media (max-width: 480px) {
+    .track {
+      padding: 12px 14px;
+      font-size: 0.95rem;
+    }
   }
   .track:active {
     background: rgba(40,40,70,0.6);
@@ -392,8 +496,15 @@
     width: 100%;
     backdrop-filter: blur(25px);
     background: rgba(8,8,20,0.7);
-    padding: 18px 60px;
+    padding: 15px 20px;
     border-top: 1px solid rgba(255,255,255,0.05);
+    box-sizing: border-box;
+  }
+
+  @media (max-width: 480px) {
+    .player {
+      padding: 12px 12px;
+    }
   }
 
   #nowPlaying {
@@ -401,7 +512,10 @@
     font-weight: 400;
     letter-spacing: 0.3px;
     color: #bbb;
-    font-size: 0.95rem;
+    font-size: clamp(0.85rem, 2vw, 0.95rem);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   audio {
@@ -409,6 +523,13 @@
     filter: invert(0.06) sepia(0.1) hue-rotate(220deg) brightness(0.95);
     border-radius: 40px;
     opacity: 0.9;
+    height: 35px;
+  }
+
+  @media (max-width: 480px) {
+    audio {
+      height: 32px;
+    }
   }
 
   .custom-panel {
@@ -425,6 +546,19 @@
     z-index: 10;
     color: #ddd;
     display: none;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  @media (max-width: 768px) {
+    .custom-panel {
+      width: 90%;
+      max-width: 300px;
+      top: 50%;
+      right: 50%;
+      transform: translate(50%, -50%);
+      left: auto;
+    }
   }
 
   .custom-panel.visible {
