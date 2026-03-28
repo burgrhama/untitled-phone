@@ -170,17 +170,113 @@ function deleteCurrentAlbum() {
 }
 
 // ================== TRACK MANAGEMENT ==================
+let trackMenu = null;
+let activeMenuTrackIndex = null;
+
 function renderTracks(album) {
     const list = document.getElementById("trackList");
     list.innerHTML = "";
+    closeTrackMenu();
 
     album.tracks.forEach((track, index) => {
         const div = document.createElement("div");
         div.className = "track";
-        div.textContent = `${index + 1}. ${track.name}`;
-        div.onclick = () => playTrack(index);
+
+        const titleSpan = document.createElement("span");
+        titleSpan.textContent = `${index + 1}. ${track.name}`;
+        titleSpan.onclick = e => {
+            e.stopPropagation();
+            playTrack(index);
+        };
+        div.appendChild(titleSpan);
+
+        const optionsBtn = document.createElement("button");
+        optionsBtn.className = "track-options";
+        optionsBtn.setAttribute("aria-label", "Track options");
+        optionsBtn.textContent = "⋮";
+        optionsBtn.onclick = e => {
+            e.stopPropagation();
+            openTrackMenu(index, optionsBtn);
+        };
+        div.appendChild(optionsBtn);
+
         list.appendChild(div);
     });
+}
+
+function openTrackMenu(index, button) {
+    closeTrackMenu();
+    activeMenuTrackIndex = index;
+
+    const track = currentAlbumTracks[index];
+    if (!track) return;
+
+    const menu = document.createElement("div");
+    menu.className = "track-menu";
+    menu.innerHTML = `
+        <h4>${track.name}</h4>
+        <div class="position-info">Track ${index + 1} of ${currentAlbumTracks.length}</div>
+        <button class="menu-btn" onclick="renameCurrentTrack(event)">Rename</button>
+        <button class="menu-btn delete-btn" onclick="deleteCurrentTrack(event)">Delete</button>
+    `;
+
+    document.body.appendChild(menu);
+    const rect = button.getBoundingClientRect();
+    menu.style.position = "absolute";
+    menu.style.top = `${rect.bottom + 6 + window.scrollY}px`;
+    menu.style.left = `${rect.left + window.scrollX}px`;
+
+    trackMenu = menu;
+}
+
+function closeTrackMenu() {
+    if (trackMenu) {
+        trackMenu.remove();
+        trackMenu = null;
+        activeMenuTrackIndex = null;
+    }
+}
+
+window.addEventListener("click", e => {
+    if (!e.target.closest(".track-menu") && !e.target.classList.contains("track-options")) {
+        closeTrackMenu();
+    }
+});
+
+function renameCurrentTrack(event) {
+    event.stopPropagation();
+    if (activeMenuTrackIndex === null) return;
+
+    const newName = prompt("Rename track:", currentAlbumTracks[activeMenuTrackIndex].name);
+    if (!newName || !newName.trim()) return;
+
+    currentAlbumTracks[activeMenuTrackIndex].name = newName.trim();
+    saveCurrentAlbumTracks();
+    renderTracks({ tracks: currentAlbumTracks });
+    closeTrackMenu();
+}
+
+function deleteCurrentTrack(event) {
+    event.stopPropagation();
+    if (activeMenuTrackIndex === null) return;
+
+    if (!confirm("Delete this track?")) return;
+
+    currentAlbumTracks.splice(activeMenuTrackIndex, 1);
+    saveCurrentAlbumTracks();
+    renderTracks({ tracks: currentAlbumTracks });
+    closeTrackMenu();
+}
+
+function saveCurrentAlbumTracks() {
+    if (!currentAlbumId) return;
+    db.transaction("albums", "readwrite")
+      .objectStore("albums")
+      .get(currentAlbumId).onsuccess = e => {
+          const album = e.target.result;
+          album.tracks = currentAlbumTracks;
+          saveAlbum(album);
+      };
 }
 
 function addSongs() {
