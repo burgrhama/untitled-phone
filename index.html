@@ -968,7 +968,6 @@
 </div>
 
 <header>
-<!-- Clicking the title now calls goHome() without any side effects -->
 <h1 onclick="goHome()">pirated untitled</h1>
 <div>
 <button class="btn" onclick="createAlbum()">make an album</button>
@@ -980,16 +979,13 @@
 <!-- home grid -->
 <div id="home" class="album-grid"></div>
 
-<!-- album detail view (with back button) -->
+<!-- album detail view -->
 <div id="albumPage" class="album-view">
   <div class="album-layout">
     <div class="cover-container">
       <img id="albumCover" class="cover-large">
       <button class="album-arrow" onclick="toggleAlbumMenu()">▼</button>
-      <!-- Album Switcher Menu -->
-      <div id="albumMenu" class="album-menu" style="display: none;">
-        <!-- Content populated by JavaScript -->
-      </div>
+      <div id="albumMenu" class="album-menu" style="display: none;"></div>
     </div>
     <div style="flex:1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
       <h2 id="albumTitle" class="album-title" style="margin-right: 8px;"></h2>
@@ -999,7 +995,6 @@
     <input type="file" id="songUpload" multiple accept="audio/*">
       <button class="btn" onclick="addSongs()" style="margin-left:0;">add tracks</button>
       <br><br>
-      <!-- track list container with drag-and-drop -->
       <div id="trackList" class="track-list"></div>
     </div>
   </div>
@@ -1011,7 +1006,7 @@
 <audio id="audioPlayer" controls style="width:100%; margin-top:8px;"></audio>
 </div>
 
-<!-- CUSTOMIZATION PANEL WITH REACTIVITY SLIDER (saved settings) -->
+<!-- CUSTOMIZATION PANEL -->
 <div class="custom-panel" id="panel">
 <button class="close-btn" onclick="togglePanel()">×</button>
 <h3>particle lab</h3>
@@ -1023,7 +1018,7 @@
 <input type="range" id="countSlider" min="300" max="10000" step="50" value="5000">
 
 <button class="btn" onclick="resetParticles()">reshuffle swarm</button>
-<p style="font-size:0.8rem; opacity:0.6; margin-top:20px;">• particles wrap around edges<br>• reactivity 0.5 = your perfect subtle push (0.0009×raw)<br>• settings auto-save</p>
+<p style="font-size:0.8rem; opacity:0.6; margin-top:20px;">• particles wrap around edges<br>• reactivity 0.5 = subtle push (0.0009×raw)<br>• settings auto-save</p>
 </div>
 
 <script>
@@ -1138,7 +1133,7 @@ function checkAuth() {
   
   if (token && email) {
     document.getElementById('authOverlay').classList.add('hidden');
-    syncAlbumsFromServer(); // Load user's albums from server
+    syncAlbumsFromServer();
   } else {
     document.getElementById('authOverlay').classList.remove('hidden');
   }
@@ -1154,7 +1149,6 @@ const request = indexedDB.open("PiratedUntitledDB", 1);
 request.onupgradeneeded = e => {
   db = e.target.result;
   db.createObjectStore("albums", { keyPath: "id", autoIncrement: true });
-  // also create a store for particle settings
   if (!db.objectStoreNames.contains("settings")) {
     db.createObjectStore("settings");
   }
@@ -1165,7 +1159,7 @@ request.onsuccess = e => {
   loadParticleSettings();
 };
 
-// ===== SYNC FUNCTIONS =====
+// ===== SYNC FUNCTIONS - FIXED FOR CROSS-DEVICE PLAYBACK =====
 async function syncAlbumsFromServer() {
   const token = localStorage.getItem('token');
   if (!token) return;
@@ -1179,40 +1173,34 @@ async function syncAlbumsFromServer() {
 
     const serverAlbums = await res.json();
 
-    // Get current local albums
     db.transaction("albums", "readonly")
       .objectStore("albums")
       .getAll().onsuccess = (e) => {
         const localAlbums = e.target.result;
         const localMap = new Map(localAlbums.map(a => [a.id, a]));
 
-        // Merge: keep local tracks (blobs), update metadata from server
         const mergedAlbums = serverAlbums.map(serverAlbum => {
           const localAlbum = localMap.get(serverAlbum.id);
-          const serverTracks = (serverAlbum.tracks || []).map(track => {
-          if (track.url && !track.url.startsWith('http')) {
-            return { ...track, url: window.location.origin + track.url };
-          }
-          return track;
+          
+          // Server tracks already have absolute URLs from server
+          const serverTracks = (serverAlbum.tracks || []);
+
+          // Merge: prefer server URLs for cross-device playback
+          const mergedTracks = (localAlbum && localAlbum.tracks && localAlbum.tracks.length > 0)
+            ? localAlbum.tracks.map(localTrack => {
+                const serverMatch = serverTracks.find(s => s.name === localTrack.name);
+                return serverMatch ? { ...localTrack, url: serverMatch.url || localTrack.url } : localTrack;
+              })
+            : serverTracks;
+
+          return {
+            id: serverAlbum.id,
+            name: serverAlbum.name,
+            cover: serverAlbum.cover,
+            tracks: mergedTracks
+          };
         });
 
-        // Prefer server track URLs for cross-device playback; keep local blobs when no URL exists
-        const mergedTracks = (localAlbum && localAlbum.tracks && localAlbum.tracks.length > 0)
-          ? localAlbum.tracks.map(localTrack => {
-              const serverMatch = serverTracks.find(s => s.name === localTrack.name);
-              return serverMatch ? { ...localTrack, url: serverMatch.url || localTrack.url } : localTrack;
-            })
-          : serverTracks;
-
-        return {
-          id: serverAlbum.id,
-          name: serverAlbum.name,
-          cover: serverAlbum.cover,
-          tracks: mergedTracks
-        };
-      });
-
-        // Clear and reload
         db.transaction("albums", "readwrite")
           .objectStore("albums")
           .clear().onsuccess = () => {
@@ -1713,8 +1701,7 @@ async function addSongs() {
 
         if (res.ok) {
           const data = await res.json();
-          const origin = window.location.origin;
-          track.url = data.url.startsWith('http') ? data.url : origin + data.url;
+          track.url = data.url;
         } else {
           console.warn('Track upload failed:', file.name);
           track.url = URL.createObjectURL(file);
@@ -1726,7 +1713,6 @@ async function addSongs() {
         track.blob = file;
       }
     } else {
-      // no auth token, use local fallback
       track.url = URL.createObjectURL(file);
       track.blob = file;
     }
@@ -1744,11 +1730,7 @@ function playTrack(index) {
   const player = document.getElementById("audioPlayer");
 
   if (track.url) {
-    if (track.url.startsWith('/')) {
-      player.src = window.location.origin + track.url;
-    } else {
-      player.src = track.url;
-    }
+    player.src = track.url;
   } else if (track.blob) {
     player.src = URL.createObjectURL(track.blob);
   } else {
@@ -1971,10 +1953,7 @@ window.deleteTrack = deleteTrack;
 window.addToQueue = addToQueue;
 window.showQueue = showQueue;
 window.removeFromQueue = removeFromQueue;
-window.switchAlbum = switchAlbum;
 window.toggleAlbumMenu = toggleAlbumMenu;
-window.setReactive = function() {};
-window.clearBackground = function() { resetParticles(); };
 window.logout = logout;
 window.handleLogin = handleLogin;
 window.handleSignup = handleSignup;
