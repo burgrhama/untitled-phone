@@ -1189,17 +1189,17 @@ async function syncAlbumsFromServer() {
         // Merge: keep local tracks (blobs), update metadata from server
         const mergedAlbums = serverAlbums.map(serverAlbum => {
           const localAlbum = localMap.get(serverAlbum.id);
-          if (localAlbum && localAlbum.tracks.length > 0) {
-            // Keep local tracks (they have blobs), update name and cover from server
-            return {
-              id: serverAlbum.id,
-              name: serverAlbum.name,
-              cover: serverAlbum.cover,
-              tracks: localAlbum.tracks
-            };
-          }
-          // New album from server
-          return serverAlbum;
+          const tracks = localAlbum && localAlbum.tracks && localAlbum.tracks.length > 0
+            ? localAlbum.tracks
+            : serverAlbum.tracks || [];
+
+          // Merge album metadata with track source preference for local data
+          return {
+            id: serverAlbum.id,
+            name: serverAlbum.name,
+            cover: serverAlbum.cover,
+            tracks
+          };
         });
 
         // Clear and reload
@@ -1224,10 +1224,9 @@ async function syncAlbumToServer(album) {
   if (!token) return;
 
   try {
-    // Convert blobs to base64 for server storage
     const tracksForServer = album.tracks.map(track => ({
       name: track.name,
-      blob: track.blob ? 'blob_placeholder' : null // Don't send blob to server
+      url: track.url || null
     }));
 
     const res = await fetch(`/api/albums/${album.id}`, {
@@ -1666,23 +1665,81 @@ function removeFromQueue(queueIndex) {
   showQueue();
 }
 
-function addSongs() {
-  db.transaction("albums", "readonly")
-    .objectStore("albums")
-    .get(currentAlbumId).onsuccess = e => {
-      const album = e.target.result;
-      Array.from(document.getElementById("songUpload").files)
-        .forEach(file => album.tracks.push({ name: file.name, blob: file }));
-      save(album);
-      syncAlbumToServer(album);
-      renderTracks(album);
-    };
+function getCurrentAlbumFromDB() {
+  return new Promise((resolve, reject) => {
+    if (!currentAlbumId) {
+      return resolve(null);
+    }
+    db.transaction("albums", "readonly")
+      .objectStore("albums")
+      .get(currentAlbumId).onsuccess = e => {
+        resolve(e.target.result);
+      };
+  });
+}
+
+async function addSongs() {
+  const files = document.getElementById("songUpload").files;
+  if (!files.length) return;
+
+  const album = await getCurrentAlbumFromDB();
+  if (!album) return;
+
+  const token = localStorage.getItem('token');
+
+  for (let file of files) {
+    const track = { name: file.name };
+
+    if (token) {
+      try {
+        const formData = new FormData();
+        formData.append('track', file);
+
+        const res = await fetch('/api/upload-track', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token },
+          body: formData
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          track.url = data.url;
+        } else {
+          console.warn('Track upload failed:', file.name);
+          track.url = URL.createObjectURL(file);
+          track.blob = file;
+        }
+      } catch (err) {
+        console.warn('Track upload error:', err);
+        track.url = URL.createObjectURL(file);
+        track.blob = file;
+      }
+    } else {
+      track.url = URL.createObjectURL(file);
+      track.blob = file;
+    }
+
+    album.tracks.push(track);
+  }
+
+  save(album);
+  syncAlbumToServer(album);
+  renderTracks(album);
 }
 
 function playTrack(index) {
   const track = currentAlbumTracks[index];
   const player = document.getElementById("audioPlayer");
-  player.src = URL.createObjectURL(track.blob);
+
+  if (track.url) {
+    player.src = track.url;
+  } else if (track.blob) {
+    player.src = URL.createObjectURL(track.blob);
+  } else {
+    console.error('Track has no source', track);
+    return;
+  }
+
   player.play();
   document.getElementById("nowPlaying").innerText = "● " + track.name;
   currentTrackIndex = index;

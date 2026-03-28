@@ -4,6 +4,25 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const path = require('path');
+const multer = require('multer');
+const fs = require('fs');
+
+const uploadDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir);
+}
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, `${Date.now()}-${safeName}`);
+  }
+});
+
+const upload = multer({ storage });
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -199,6 +218,16 @@ app.post('/api/albums', verifyToken, (req, res) => {
       }
     );
   });
+});
+
+// ===== UPLOAD TRACK FILE =====
+app.post('/api/upload-track', verifyToken, upload.single('track'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'No file uploaded' });
+  }
+
+  const url = `/uploads/${encodeURIComponent(req.file.filename)}`;
+  res.json({ name: req.file.originalname, url });
 });
 
 // ===== UPDATE ALBUM =====
