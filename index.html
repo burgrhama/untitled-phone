@@ -2,13 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-
 <title>pirated untitled · drag to reorder</title>
 
 <!-- PWA -->
-<link rel="manifest" href="/untitled123111/manifest.json">
+<link rel="manifest" href="/manifest.json">
 <meta name="theme-color" content="#000000">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black">
@@ -34,16 +32,127 @@ body {
   z-index: -1;
 }
 
+/* Auth Pages */
+.auth-container {
+  display: flex !important;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  z-index: 100;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+
+.auth-container.hidden {
+  display: none !important;
+}
+
+.auth-form {
+  background: #111;
+  padding: 40px;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 400px;
+  border: 1px solid #333;
+}
+
+.auth-form h2 {
+  margin-bottom: 20px;
+  font-size: 24px;
+}
+
+.auth-form input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 15px;
+  background: #222;
+  border: 1px solid #444;
+  color: #eee;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.auth-form input:focus {
+  outline: none;
+  border-color: #666;
+}
+
+.auth-form button {
+  width: 100%;
+  padding: 12px;
+  background: #1db954;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.auth-form button:hover {
+  background: #1ed760;
+}
+
+.auth-toggle {
+  text-align: center;
+  color: #aaa;
+  font-size: 14px;
+}
+
+.auth-toggle a {
+  color: #1db954;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.error-message {
+  color: #ff6b6b;
+  margin-bottom: 15px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.success-message {
+  color: #1db954;
+  margin-bottom: 15px;
+  font-size: 14px;
+  text-align: center;
+}
+
+/* Main App */
+#appContainer {
+  display: none;
+}
+
 /* header */
 header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 20px;
+  border-bottom: 1px solid #222;
 }
 
 header h1 {
   font-size: 28px;
+  cursor: pointer;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.user-email {
+  font-size: 14px;
+  color: #aaa;
+  margin-right: 15px;
 }
 
 .btn {
@@ -53,6 +162,20 @@ header h1 {
   padding: 10px 16px;
   border-radius: 20px;
   cursor: pointer;
+  font-size: 14px;
+}
+
+.btn:hover {
+  background: #333;
+}
+
+.btn-logout {
+  background: #ff6b6b;
+  border-color: #ff6b6b;
+}
+
+.btn-logout:hover {
+  background: #ff5252;
 }
 
 /* grid */
@@ -63,9 +186,24 @@ header h1 {
   padding: 20px;
 }
 
+.album-card {
+  cursor: pointer;
+}
+
 .album-card img {
   width: 100%;
+  height: 140px;
+  background: #222;
   border-radius: 12px;
+  object-fit: cover;
+}
+
+.album-card p {
+  margin-top: 10px;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* album view */
@@ -74,10 +212,41 @@ header h1 {
   padding: 20px;
 }
 
+.album-header {
+  display: flex;
+  gap: 30px;
+  margin-bottom: 40px;
+}
+
 .cover-large {
   width: 200px;
   height: 200px;
+  background: #222;
   border-radius: 16px;
+}
+
+.album-info input {
+  background: #222;
+  color: #eee;
+  border: 1px solid #444;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  width: 100%;
+}
+
+.album-info button {
+  background: #1db954;
+  color: #fff;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+.album-info button:hover {
+  background: #1ed760;
 }
 
 /* player */
@@ -86,7 +255,42 @@ header h1 {
   bottom: 0;
   width: 100%;
   background: #111;
+  padding: 15px 20px;
+  border-top: 1px solid #222;
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+#nowPlaying {
+  flex: 1;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#audioPlayer {
+  flex: 1;
+  max-width: 300px;
+  height: 30px;
+}
+
+.track {
   padding: 10px;
+  margin-bottom: 5px;
+  background: #111;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid #222;
+}
+
+.track:hover {
+  background: #1db954;
+}
+
+#trackList {
+  margin-top: 20px;
 }
 </style>
 </head>
@@ -95,157 +299,73 @@ header h1 {
 
 <canvas id="particleCanvas"></canvas>
 
-<header>
-<h1 onclick="goHome()">pirated untitled</h1>
-<div>
-<button class="btn" onclick="createAlbum()">make an album</button>
+<!-- Auth Container -->
+<div id="authContainer" class="auth-container active" style="display: flex;">
+  <!-- Login Form -->
+  <div id="loginForm" class="auth-form" style="display: block;">
+    <h2>Sign In</h2>
+    <div id="loginError" class="error-message"></div>
+    <input type="email" id="loginEmail" placeholder="Email" autocomplete="email">
+    <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password">
+    <button onclick="handleLogin()">Sign In</button>
+    <div class="auth-toggle">
+      Don't have an account? <a onclick="toggleAuthForm()">Sign Up</a>
+    </div>
+  </div>
+
+  <!-- Signup Form -->
+  <div id="signupForm" class="auth-form" style="display: none;">
+    <h2>Create Account</h2>
+    <div id="signupError" class="error-message"></div>
+    <input type="email" id="signupEmail" placeholder="Email" autocomplete="email">
+    <input type="password" id="signupPassword" placeholder="Password" autocomplete="new-password">
+    <input type="password" id="signupConfirmPassword" placeholder="Confirm Password" autocomplete="new-password">
+    <button onclick="handleSignup()">Sign Up</button>
+    <div class="auth-toggle">
+      Already have an account? <a onclick="toggleAuthForm()">Sign In</a>
+    </div>
+  </div>
 </div>
-</header>
 
-<div id="home" class="album-grid"></div>
+<!-- Main App Container -->
+<div id="appContainer" style="display: none;">
+  <header>
+    <h1 onclick="goHome()">pirated untitled</h1>
+    <div class="header-actions">
+      <span class="user-email" id="userEmail"></span>
+      <button class="btn" onclick="createAlbum()">make an album</button>
+      <button class="btn btn-logout" onclick="handleLogout()">Logout</button>
+    </div>
+  </header>
 
-<div id="albumPage" class="album-view">
-  <img id="albumCover" class="cover-large">
-  <h2 id="albumTitle"></h2>
+  <div id="home" class="album-grid"></div>
 
-  <input type="file" id="songUpload" multiple accept="audio/*">
-  <button class="btn" onclick="addSongs()">add tracks</button>
+  <div id="albumPage" class="album-view">
+    <div class="album-header">
+      <img id="albumCover" class="cover-large">
+      <div class="album-info">
+        <input type="text" id="albumTitle" placeholder="Album Title">
+        <button onclick="saveAlbumTitle()">Save Title</button>
+        <button onclick="deleteCurrentAlbum()" style="background: #ff6b6b;">Delete Album</button>
+      </div>
+    </div>
 
-  <div id="trackList"></div>
+    <div>
+      <input type="file" id="songUpload" multiple accept="audio/*">
+      <button class="btn" onclick="addSongs()">add tracks</button>
+    </div>
+
+    <div id="trackList"></div>
+  </div>
+
+  <div class="player">
+    <div id="nowPlaying">no track</div>
+    <audio id="audioPlayer" controls></audio>
+  </div>
 </div>
 
-<div class="player">
-<div id="nowPlaying">no track</div>
-<audio id="audioPlayer" controls></audio>
-</div>
-
-<script>
-// ===== DATABASE =====
-let db;
-let currentAlbumId = null;
-
-const request = indexedDB.open("appDB", 1);
-
-request.onupgradeneeded = e => {
-  db = e.target.result;
-  db.createObjectStore("albums", { keyPath: "id", autoIncrement: true });
-};
-
-request.onsuccess = e => {
-  db = e.target.result;
-  renderHome();
-};
-
-// ===== FUNCTIONS =====
-function getAll(cb) {
-  db.transaction("albums", "readonly")
-    .objectStore("albums")
-    .getAll().onsuccess = e => cb(e.target.result);
-}
-
-function save(album) {
-  db.transaction("albums", "readwrite")
-    .objectStore("albums")
-    .put(album);
-}
-
-function createAlbum() {
-  db.transaction("albums", "readwrite")
-    .objectStore("albums")
-    .add({ name: "untitled", tracks: [] })
-    .onsuccess = renderHome;
-}
-
-function renderHome() {
-  getAll(albums => {
-    const home = document.getElementById("home");
-    home.innerHTML = "";
-
-    albums.forEach(album => {
-      const div = document.createElement("div");
-      div.className = "album-card";
-      div.onclick = () => openAlbum(album.id);
-
-      const img = document.createElement("img");
-      img.src = "";
-      div.appendChild(img);
-
-      const p = document.createElement("p");
-      p.textContent = album.name;
-      div.appendChild(p);
-
-      home.appendChild(div);
-    });
-  });
-}
-
-function openAlbum(id) {
-  currentAlbumId = id;
-
-  document.getElementById("home").style.display = "none";
-  document.getElementById("albumPage").style.display = "block";
-
-  db.transaction("albums", "readonly")
-    .objectStore("albums")
-    .get(id).onsuccess = e => {
-      const album = e.target.result;
-      document.getElementById("albumTitle").textContent = album.name;
-
-      renderTracks(album);
-    };
-}
-
-function renderTracks(album) {
-  const list = document.getElementById("trackList");
-  list.innerHTML = "";
-
-  album.tracks.forEach((t, i) => {
-    const div = document.createElement("div");
-    div.textContent = t.name;
-    div.onclick = () => playTrack(t);
-    list.appendChild(div);
-  });
-}
-
-function addSongs() {
-  const files = document.getElementById("songUpload").files;
-
-  db.transaction("albums", "readwrite")
-    .objectStore("albums")
-    .get(currentAlbumId).onsuccess = e => {
-      const album = e.target.result;
-
-      for (let file of files) {
-        album.tracks.push({
-          name: file.name,
-          url: URL.createObjectURL(file)
-        });
-      }
-
-      save(album);
-      openAlbum(currentAlbumId);
-    };
-}
-
-function playTrack(track) {
-  const audio = document.getElementById("audioPlayer");
-  audio.src = track.url;
-  audio.play();
-
-  document.getElementById("nowPlaying").textContent = track.name;
-}
-
-function goHome() {
-  document.getElementById("albumPage").style.display = "none";
-  document.getElementById("home").style.display = "grid";
-  renderHome();
-}
-
-// ===== SERVICE WORKER =====
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/untitled123111/service-worker.js");
-}
-</script>
+<script src="auth.js"></script>
+<script src="script.js"></script>
 
 </body>
 </html>

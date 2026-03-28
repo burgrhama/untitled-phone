@@ -18,7 +18,6 @@ request.onupgradeneeded = e => {
 
 request.onsuccess = e => {
     db = e.target.result;
-    renderHome();
 };
 
 // ================== AUDIO PLAYER ==================
@@ -41,16 +40,16 @@ function playTrack(index) {
     currentTrackIndex = index;
     audio.src = track.url;
     audio.play();
-    nowPlaying.textContent = track.name;
+    nowPlaying.textContent = `${track.name}`;
 
     // Update Media Session metadata
     if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({
             title: track.name,
-            artist: currentAlbumTracks[index].artist || "Unknown Artist",
-            album: currentAlbumTracks[index].album || "Untitled Album",
+            artist: track.artist || "Unknown Artist",
+            album: track.album || "Untitled Album",
             artwork: [
-                { src: "/untitled123111/icon-192.png", sizes: "192x192", type: "image/png" }
+                { src: "/icon-192.png", sizes: "192x192", type: "image/png" }
             ]
         });
     }
@@ -91,8 +90,6 @@ function createAlbum() {
 }
 
 function deleteAlbum(albumId) {
-    if (albumId === currentAlbumId) goHome();
-
     db.transaction("albums", "readwrite")
       .objectStore("albums")
       .delete(albumId)
@@ -134,7 +131,7 @@ function openAlbum(albumId) {
           currentAlbumTracks = album.tracks;
 
           const title = document.getElementById("albumTitle");
-          title.textContent = album.name;
+          title.value = album.name;
 
           renderTracks(album);
       };
@@ -145,6 +142,31 @@ function goHome() {
     document.getElementById("home").style.display = "grid";
     renderHome();
     currentAlbumId = null;
+}
+
+function saveAlbumTitle() {
+    const newTitle = document.getElementById("albumTitle").value;
+
+    if (!newTitle.trim()) {
+        alert("Title cannot be empty");
+        return;
+    }
+
+    db.transaction("albums", "readwrite")
+      .objectStore("albums")
+      .get(currentAlbumId).onsuccess = e => {
+          const album = e.target.result;
+          album.name = newTitle;
+          saveAlbum(album);
+          renderHome();
+      };
+}
+
+function deleteCurrentAlbum() {
+    if (confirm("Delete this album?")) {
+        deleteAlbum(currentAlbumId);
+        goHome();
+    }
 }
 
 // ================== TRACK MANAGEMENT ==================
@@ -182,7 +204,7 @@ function addSongs() {
 
 // ================== SERVICE WORKER ==================
 if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/untitled123111/service-worker.js")
+    navigator.serviceWorker.register("/service-worker.js")
       .then(() => console.log("Service Worker registered"))
       .catch(err => console.log("Service Worker failed:", err));
 }
