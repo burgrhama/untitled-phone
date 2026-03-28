@@ -991,10 +991,12 @@
         <!-- Content populated by JavaScript -->
       </div>
     </div>
-    <div style="flex:1;">
-      <h2 id="albumTitle" class="album-title"></h2>
-      <br>
-      <input type="file" id="songUpload" multiple accept="audio/*">
+    <div style="flex:1; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+      <h2 id="albumTitle" class="album-title" style="margin-right: 8px;"></h2>
+      <button id="albumPlayButton" class="btn" onclick="playAlbumStart()">▶ play from top</button>
+    </div>
+    <br>
+    <input type="file" id="songUpload" multiple accept="audio/*">
       <button class="btn" onclick="addSongs()" style="margin-left:0;">add tracks</button>
       <br><br>
       <!-- track list container with drag-and-drop -->

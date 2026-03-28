@@ -133,6 +133,9 @@ function openAlbum(albumId) {
           const title = document.getElementById("albumTitle");
           title.value = album.name;
 
+          const albumPlayButton = document.getElementById("albumPlayButton");
+          albumPlayButton.disabled = !album.tracks || album.tracks.length === 0;
+
           renderTracks(album);
       };
 }
@@ -142,6 +145,14 @@ function goHome() {
     document.getElementById("home").style.display = "grid";
     renderHome();
     currentAlbumId = null;
+}
+
+function playAlbumStart() {
+    if (currentAlbumTracks.length > 0) {
+        playTrack(0);
+    } else {
+        alert("This album has no tracks yet.");
+    }
 }
 
 function saveAlbumTitle() {
