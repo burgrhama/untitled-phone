@@ -6,12 +6,36 @@ const cors = require('cors');
 const path = require('path');
 
 const app = express();
-const PORT = 3000;
-const SECRET_KEY = 'your-secret-key-change-this-in-production';
+const PORT = process.env.PORT || 3000;
+const SECRET_KEY = process.env.SECRET_KEY || 'your-secret-key-change-this-in-production';
 
-// Middleware
-app.use(express.json());
-app.use(cors());
+// Middleware - CORS first
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://127.0.0.1:3000',
+    'https://burgrhama.github.io',
+    'https://burgrhama.github.io/untitled-phone/',
+    'https://burgrhama.github.io/untitled-phone'
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Then JSON parser
+app.use(express.json({ limit: '10mb' }));
+
+// Error handler for JSON parsing
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Invalid JSON' });
+  }
+  next();
+});
+
+// Static files
 app.use(express.static(path.join(__dirname)));
 
 // Database setup
@@ -52,6 +76,12 @@ app.post('/api/signup', async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
 
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return res.status(400).json({ error: 'Invalid email format' });
+  }
+
   try {
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -60,6 +90,7 @@ app.post('/api/signup', async (req, res) => {
         if (err.message.includes('UNIQUE constraint failed')) {
           return res.status(400).json({ error: 'Email already registered' });
         }
+        console.error('Database error:', err);
         return res.status(500).json({ error: 'Database error' });
       }
 
@@ -67,6 +98,7 @@ app.post('/api/signup', async (req, res) => {
       res.status(201).json({ message: 'Account created successfully', token, email });
     });
   } catch (error) {
+    console.error('Signup error:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -81,6 +113,7 @@ app.post('/api/login', (req, res) => {
 
   db.get('SELECT * FROM users WHERE email = ?', [email], async (err, user) => {
     if (err) {
+      console.error('Database error:', err);
       return res.status(500).json({ error: 'Database error' });
     }
 
@@ -98,6 +131,7 @@ app.post('/api/login', (req, res) => {
       const token = jwt.sign({ email: user.email, id: user.id }, SECRET_KEY, { expiresIn: '7d' });
       res.json({ message: 'Login successful', token, email: user.email });
     } catch (error) {
+      console.error('Password compare error:', error);
       res.status(500).json({ error: 'Server error' });
     }
   });
@@ -120,6 +154,7 @@ app.get('/api/profile', (req, res) => {
 });
 
 // ===== START SERVER =====
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running on port ${PORT}`);
+  console.log(`GitHub Pages URL: https://burgrhama.github.io/untitled-phone/`);
 });

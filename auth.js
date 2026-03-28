@@ -1,3 +1,15 @@
+// ===== API URL HELPER =====
+const API_BASE_URL = 'https://untitled-phone-api.onrender.com'; // Change this to your backend URL
+
+function getApiUrl(endpoint) {
+  // If running locally on localhost
+  if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:3000' + endpoint;
+  }
+  // For deployed versions, use the API_BASE_URL
+  return API_BASE_URL + endpoint;
+}
+
 // ===== AUTHENTICATION =====
 
 async function handleLogin() {
@@ -13,7 +25,10 @@ async function handleLogin() {
   }
 
   try {
-    const response = await fetch('/api/login', {
+    const apiUrl = getApiUrl('/api/login');
+    console.log('Login API URL:', apiUrl);
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -33,6 +48,7 @@ async function handleLogin() {
     // Show app, hide auth
     showApp();
   } catch (error) {
+    console.error('Login error:', error);
     errorDiv.textContent = 'Network error. Please try again.';
   }
 }
@@ -61,7 +77,10 @@ async function handleSignup() {
   }
 
   try {
-    const response = await fetch('/api/signup', {
+    const apiUrl = getApiUrl('/api/signup');
+    console.log('Signup API URL:', apiUrl);
+    
+    const response = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, confirmPassword })
@@ -81,6 +100,7 @@ async function handleSignup() {
     // Show app, hide auth
     showApp();
   } catch (error) {
+    console.error('Signup error:', error);
     errorDiv.textContent = 'Network error. Please try again.';
   }
 }
