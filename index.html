@@ -2,198 +2,744 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>pirated untitled · drag to reorder</title>
-
-<!-- PWA -->
-<link rel="manifest" href="/untitled123111/manifest.json">
-<meta name="theme-color" content="#000000">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black">
-
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
 
-body {
-  background: #000;
-  color: #eee;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  overflow-x: hidden;
-  min-height: 100vh;
-}
+  body {
+    background: #000;
+    color: #eee;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+    min-height: 100vh;
+  }
 
-/* Auth Overlay */
-#authOverlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: #000;
-  z-index: 1000;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-direction: column;
-}
+  /* canvas background – particles wrap around edges */
+  #particleCanvas {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    z-index: -1;
+    pointer-events: none;
+    background: radial-gradient(circle at 30% 30%, #0c0c16, #020208);
+  }
 
-#authOverlay.hidden {
-  display: none;
-}
+  /* subtle grain */
+  body::after {
+    content: '';
+    position: fixed;
+    top:0; left:0; width:100%; height:100%;
+    background: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzMDAiIGhlaWdodD0iMzAwIj48ZmlsdGVyIGlkPSJmIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iLjc1IiBudW1PY3RhdmVzPSIzIiAvPjwvZmlsdGVyPjxyZWN0IHdpZHRoPSIxMDAlIiBoZWlnaHQ9IjEwMCUiIGZpbHRlcj0idXJsKCNmKSIgb3BhY2l0eT0iMC4wMTUiIC8+PC9zdmc+');
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.08;
+  }
 
-.auth-box {
-  background: #111;
-  padding: 40px;
-  border-radius: 16px;
-  width: 90%;
-  max-width: 400px;
-  border: 1px solid #333;
-}
+  /* AUTH OVERLAY */
+  #authOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 1000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    backdrop-filter: blur(4px);
+  }
 
-.auth-box h2 {
-  margin-bottom: 20px;
-  font-size: 24px;
-}
+  #authOverlay.hidden {
+    display: none;
+  }
 
-.auth-box input {
-  width: 100%;
-  padding: 12px;
-  margin-bottom: 15px;
-  background: #222;
-  border: 1px solid #444;
-  color: #eee;
-  border-radius: 8px;
-}
+  .auth-box {
+    background: rgba(10, 10, 22, 0.85);
+    backdrop-filter: blur(24px);
+    padding: 40px;
+    border-radius: 36px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 20px 40px black;
+  }
 
-.auth-box input:focus {
-  outline: none;
-  border-color: #1db954;
-}
+  .auth-box h2 {
+    margin-bottom: 25px;
+    font-size: 28px;
+    font-weight: 600;
+    color: #e8e0ff;
+    letter-spacing: -0.5px;
+  }
 
-.auth-box button {
-  width: 100%;
-  padding: 12px;
-  background: #1db954;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  margin-bottom: 10px;
-}
+  .auth-box input {
+    width: 100%;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    background: rgba(40, 40, 60, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    color: #fff;
+    font-size: 14px;
+    transition: 0.2s ease;
+  }
 
-.auth-box button:hover {
-  background: #1ed760;
-}
+  .auth-box input:focus {
+    outline: none;
+    border-color: rgba(160, 160, 255, 0.5);
+    background: rgba(40, 40, 60, 0.95);
+    box-shadow: 0 0 12px rgba(160, 160, 255, 0.2);
+  }
 
-.auth-toggle {
-  text-align: center;
-  color: #aaa;
-  font-size: 14px;
-}
+  .auth-box button {
+    width: 100%;
+    padding: 14px 16px;
+    background: rgba(200, 200, 240, 0.12);
+    color: #f0f0ff;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 15px;
+    transition: 0.2s ease;
+    backdrop-filter: blur(8px);
+    margin-top: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
 
-.auth-toggle a {
-  color: #1db954;
-  cursor: pointer;
-  text-decoration: underline;
-}
+  .auth-box button:hover {
+    background: rgba(200, 200, 240, 0.2);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.01);
+  }
 
-.error {
-  color: #ff6b6b;
-  margin-bottom: 15px;
-  font-size: 14px;
-}
+  .auth-toggle {
+    text-align: center;
+    color: #aaa;
+    font-size: 13px;
+    margin-top: 15px;
+  }
 
-/* canvas */
-#particleCanvas {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: -1;
-}
+  .auth-toggle a {
+    color: #b3b3ff;
+    cursor: pointer;
+    text-decoration: underline;
+    transition: 0.2s;
+  }
 
-/* header */
-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 20px;
-}
+  .auth-toggle a:hover {
+    color: #d0d0ff;
+  }
 
-header h1 {
-  font-size: 28px;
-  cursor: pointer;
-}
+  .auth-error {
+    color: #ff9999;
+    margin-bottom: 15px;
+    font-size: 13px;
+    text-align: center;
+    min-height: 18px;
+  }
 
-.btn {
-  background: #222;
-  color: #fff;
-  border: 1px solid #444;
-  padding: 10px 16px;
-  border-radius: 20px;
-  cursor: pointer;
-}
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 30px 60px;
+    backdrop-filter: blur(2px);
+  }
 
-.btn:hover {
-  background: #333;
-}
+  header h1 {
+    font-size: 42px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    text-shadow: 0 0 20px rgba(150,150,240,0.2);
+    color: #f0f0ff;
+    display: inline-block;
+    cursor: pointer;
+  }
 
-.btn-logout {
-  background: #ff6b6b;
-  border-color: #ff6b6b;
-}
+  .btn {
+    background: rgba(200,200,240,0.08);
+    color: #f0f0ff;
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 12px 22px;
+    font-weight: 500;
+    border-radius: 40px;
+    cursor: pointer;
+    transition: 0.2s ease;
+    backdrop-filter: blur(8px);
+    margin-left: 12px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  }
 
-/* grid */
-.album-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 140px);
-  gap: 20px;
-  padding: 20px;
-}
+  .btn:hover {
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.3);
+    transform: scale(1.02);
+    color: white;
+  }
 
-.album-card img {
-  width: 100%;
-  border-radius: 12px;
-  cursor: pointer;
-}
+  .btn-logout {
+    background: rgba(255, 100, 100, 0.15);
+    border-color: rgba(255, 100, 100, 0.3);
+    color: #ffb3b3;
+  }
 
-/* album view */
-.album-view {
-  display: none;
-  padding: 20px;
-}
+  .btn-logout:hover {
+    background: rgba(255, 100, 100, 0.25);
+    border-color: rgba(255, 100, 100, 0.5);
+    color: #fff;
+  }
 
-.cover-large {
-  width: 200px;
-  height: 200px;
-  border-radius: 16px;
-}
+  .album-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, 160px);
+    gap: 25px;
+    padding: 40px 60px;
+  }
 
-/* player */
-.player {
-  position: fixed;
-  bottom: 0;
-  width: 100%;
-  background: #111;
-  padding: 10px;
-}
+  .album-card {
+    cursor: pointer;
+    transition: 0.25s ease;
+    border-radius: 24px;
+    background: rgba(12,12,24,0.5);
+    backdrop-filter: blur(8px);
+    padding: 16px 16px 20px 16px;
+    border: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .album-card:hover {
+    transform: translateY(-6px);
+    background: rgba(25,25,45,0.7);
+    border-color: rgba(255,255,255,0.16);
+  }
+
+  .album-card img {
+    width: 100%;
+    aspect-ratio: 1/1;
+    object-fit: cover;
+    border-radius: 18px;
+    background: #2a2a3a;
+    box-shadow: 0 10px 20px #00000080;
+  }
+
+  .album-card p {
+    margin-top: 14px;
+    font-weight: 500;
+    text-align: center;
+    color: #ddd;
+  }
+
+  .album-view {
+    display: none;
+    padding: 30px 80px 50px 80px;
+  }
+
+  .album-layout {
+    display: flex;
+    gap: 60px;
+    flex-wrap: wrap;
+  }
+
+  .cover-large {
+    width: 320px;
+    height: 320px;
+    border-radius: 32px;
+    background: #2a2a3a;
+    object-fit: cover;
+    cursor: pointer;
+    transition: 0.2s ease;
+    box-shadow: 0 20px 30px #000000b3;
+    border: 2px solid rgba(255,255,255,0.07);
+  }
+
+  .cover-large:hover {
+    transform: scale(1.01);
+    border-color: rgba(255,255,255,0.2);
+  }
+
+  .album-title {
+    font-size: 44px;
+    font-weight: 600;
+    margin: 0 0 16px 0;
+    cursor: pointer;
+    display: inline-block;
+    border-bottom: 2px solid transparent;
+    transition: border 0.1s;
+    color: #e4e4ff;
+  }
+  .album-title:hover { border-bottom: 2px solid rgba(190,180,250,0.35); }
+
+  /* TRACK LIST – draggable items */
+  .track-list {
+    margin-top: 20px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 10px;
+  }
+
+  .track {
+    padding: 16px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1.1rem;
+    background: rgba(15,15,25,0.3);
+    border-radius: 16px;
+    margin-bottom: 6px;
+    backdrop-filter: blur(4px);
+    cursor: grab;
+    transition: background 0.1s, transform 0.1s;
+    border: 1px solid transparent;
+    user-select: none;
+  }
+  .track:active {
+    background: rgba(40,40,70,0.6);
+    border-color: rgba(255,255,255,0.2);
+    transform: scale(1.01);
+  }
+
+  .track span:first-child {
+    cursor: pointer;
+    flex: 1;
+  }
+
+  .track-menu {
+    position: absolute;
+    background: rgba(20,20,40,0.95);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    z-index: 100;
+    min-width: 200px;
+    color: #ddd;
+  }
+
+  .track-menu h4 {
+    margin: 0 0 12px 0;
+    font-size: 0.9rem;
+    color: #e8e0ff;
+  }
+
+  .track-menu .position-info {
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+    opacity: 0.8;
+  }
+
+  .track-menu input {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(40,40,60,0.8);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 6px;
+    color: #fff;
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+  }
+
+  .track-menu input:focus {
+    outline: none;
+    border-color: rgba(160,160,255,0.5);
+  }
+
+  .track-menu .menu-btn {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    margin-right: 8px;
+    transition: 0.2s;
+  }
+
+  .track-menu .menu-btn:hover {
+    background: rgba(255,255,255,0.2);
+  }
+
+  .track-menu .delete-btn {
+    background: rgba(255,100,100,0.2);
+    border-color: rgba(255,100,100,0.3);
+    color: #ffb3b3;
+  }
+
+  .track-menu .delete-btn:hover {
+    background: rgba(255,100,100,0.3);
+  }
+
+  .player {
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+    backdrop-filter: blur(25px);
+    background: rgba(8,8,20,0.7);
+    padding: 18px 60px;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+
+  #nowPlaying {
+    margin-bottom: 8px;
+    font-weight: 400;
+    letter-spacing: 0.3px;
+    color: #bbb;
+    font-size: 0.95rem;
+  }
+
+  audio {
+    width: 100%;
+    filter: invert(0.06) sepia(0.1) hue-rotate(220deg) brightness(0.95);
+    border-radius: 40px;
+    opacity: 0.9;
+  }
+
+  .custom-panel {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: rgba(10,10,22,0.85);
+    backdrop-filter: blur(24px);
+    padding: 28px;
+    border-radius: 36px;
+    border: 1px solid rgba(255,255,255,0.08);
+    width: 320px;
+    box-shadow: 0 20px 40px black;
+    z-index: 10;
+    color: #ddd;
+    display: none;
+  }
+
+  .custom-panel.visible {
+    display: block;
+  }
+
+  .custom-panel h3 {
+    margin-bottom: 20px;
+    font-weight: 400;
+    font-size: 1.6rem;
+    color: #e8e0ff;
+    letter-spacing: -0.5px;
+    margin-top: 10px;
+  }
+
+  .custom-panel label {
+    display: block;
+    margin: 18px 0 8px;
+    font-weight: 300;
+    opacity: 0.8;
+  }
+
+  .custom-panel input[type=range] {
+    width: 100%;
+    margin: 8px 0 16px;
+    background: #2a2a40;
+    height: 5px;
+    border-radius: 10px;
+    -webkit-appearance: none;
+  }
+  .custom-panel input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    background: #c0c0ff;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 12px #a0a0ff;
+  }
+
+  .custom-panel .value-badge {
+    float: right;
+    background: #2a2a40;
+    padding: 4px 12px;
+    border-radius: 30px;
+    font-size: 0.9rem;
+  }
+
+  .custom-panel .close-btn {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: none;
+    border: none;
+    color: #e8e0ff;
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: 0.2s ease;
+  }
+
+  .custom-panel .close-btn:hover {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+  }
+
+  .album-dropdown {
+    background: rgba(200,200,240,0.08);
+    color: #f0f0ff;
+    border: 1px solid rgba(255,255,255,0.15);
+    padding: 12px 16px;
+    border-radius: 40px;
+    font-weight: 500;
+    backdrop-filter: blur(8px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+    cursor: pointer;
+    transition: 0.2s ease;
+    min-width: 200px;
+  }
+
+  .album-dropdown:hover {
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.3);
+  }
+
+  .album-dropdown:focus {
+    outline: none;
+    border-color: rgba(160,160,255,0.5);
+    box-shadow: 0 4px 12px rgba(160,160,255,0.2);
+  }
+
+  .album-dropdown option {
+    background: #1a1a2a;
+    color: #f0f0ff;
+  }
+
+  .cover-container {
+    position: relative;
+    display: inline-block;
+  }
+
+  .album-arrow {
+    position: absolute;
+    bottom: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(200,200,240,0.9);
+    color: #000;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+
+  .album-arrow:hover {
+    background: rgba(255,255,255,0.95);
+    transform: translateX(-50%) scale(1.1);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+  }
+
+  .album-menu {
+    position: absolute;
+    top: calc(100% + 15px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(10,10,22,0.95);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 15px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    z-index: 100;
+    max-height: 400px;
+    overflow-y: auto;
+    min-width: 280px;
+  }
+
+  .album-list-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .album-item-vertical {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px;
+    cursor: pointer;
+    transition: 0.25s ease;
+    border-radius: 8px;
+    background: rgba(20,20,30,0.3);
+    border: 1px solid rgba(255,255,255,0.05);
+    position: relative;
+  }
+
+  .album-item-vertical:hover {
+    background: rgba(30,30,50,0.5);
+    border-color: rgba(255,255,255,0.15);
+    transform: translateX(3px);
+  }
+
+  .album-item-vertical.current {
+    border-color: rgba(160,160,255,0.5);
+    background: rgba(30,30,60,0.4);
+    box-shadow: 0 0 10px rgba(160,160,255,0.2);
+  }
+
+  .album-item-vertical img {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: #2a2a3a;
+    flex-shrink: 0;
+  }
+
+  .album-item-vertical .album-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .album-item-vertical .album-name {
+    font-weight: 500;
+    color: #e4e4ff;
+    font-size: 0.95rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .album-item-vertical .delete-album-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(255,100,100,0.2);
+    border: 1px solid rgba(255,100,100,0.3);
+    color: #ffb3b3;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s ease;
+    opacity: 0;
+  }
+
+  .album-item-vertical:hover .delete-album-btn {
+    opacity: 1;
+  }
+
+  .album-item-vertical .delete-album-btn:hover {
+    background: rgba(255,100,100,0.4);
+    transform: scale(1.1);
+  }
+
+  .queue-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(10,10,22,0.95);
+    backdrop-filter: blur(24px);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 20px;
+    max-width: 500px;
+    max-height: 70vh;
+    overflow-y: auto;
+    z-index: 200;
+    color: #ddd;
+  }
+
+  .queue-modal h3 {
+    margin-bottom: 15px;
+    color: #e8e0ff;
+  }
+
+  .queue-speed {
+    margin-bottom: 15px;
+  }
+
+  .queue-speed label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 300;
+  }
+
+  .queue-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    background: rgba(20,20,30,0.3);
+    border-radius: 8px;
+    margin-bottom: 5px;
+  }
+
+  .queue-item .track-name {
+    flex: 1;
+    font-weight: 500;
+  }
+
+  .queue-item .queue-controls {
+    display: flex;
+    gap: 10px;
+  }
+
+  .queue-item button {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: #fff;
+    padding: 5px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.8rem;
+  }
+
+  .queue-item button:hover {
+    background: rgba(255,255,255,0.2);
+  }
+
+  .queue-close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    background: none;
+    border: none;
+    color: #e8e0ff;
+    font-size: 20px;
+    cursor: pointer;
+  }
 </style>
 </head>
-
 <body>
 
+<!-- particle canvas (wrapping enabled) -->
 <canvas id="particleCanvas"></canvas>
 
-<!-- Auth Overlay -->
+<!-- AUTH OVERLAY -->
 <div id="authOverlay">
   <div class="auth-box">
     <div id="authForm">
       <h2>Sign In</h2>
-      <div class="error" id="authError"></div>
+      <div class="auth-error" id="authError"></div>
       <input type="email" id="authEmail" placeholder="Email">
       <input type="password" id="authPassword" placeholder="Password">
       <button onclick="handleLogin()">Sign In</button>
@@ -204,7 +750,7 @@ header h1 {
     
     <div id="signupForm" style="display: none;">
       <h2>Create Account</h2>
-      <div class="error" id="signupError"></div>
+      <div class="auth-error" id="signupError"></div>
       <input type="email" id="signupEmail" placeholder="Email">
       <input type="password" id="signupPassword" placeholder="Password (min 6)">
       <input type="password" id="signupConfirm" placeholder="Confirm Password">
@@ -217,54 +763,64 @@ header h1 {
 </div>
 
 <header>
+<!-- Clicking the title now calls goHome() without any side effects -->
 <h1 onclick="goHome()">pirated untitled</h1>
 <div>
 <button class="btn" onclick="createAlbum()">make an album</button>
-<button class="btn btn-logout" onclick="logout()">Logout</button>
+<button class="btn" onclick="togglePanel()">customize</button>
+<button class="btn btn-logout" onclick="logout()">logout</button>
 </div>
 </header>
 
+<!-- home grid -->
 <div id="home" class="album-grid"></div>
 
+<!-- album detail view (with back button) -->
 <div id="albumPage" class="album-view">
-  <img id="albumCover" class="cover-large">
-  <h2 id="albumTitle"></h2>
-
-  <input type="file" id="songUpload" multiple accept="audio/*">
-  <button class="btn" onclick="addSongs()">add tracks</button>
-
-  <div id="trackList"></div>
+  <div class="album-layout">
+    <div class="cover-container">
+      <img id="albumCover" class="cover-large">
+      <button class="album-arrow" onclick="toggleAlbumMenu()">▼</button>
+      <!-- Album Switcher Menu -->
+      <div id="albumMenu" class="album-menu" style="display: none;">
+        <!-- Content populated by JavaScript -->
+      </div>
+    </div>
+    <div style="flex:1;">
+      <h2 id="albumTitle" class="album-title"></h2>
+      <br>
+      <input type="file" id="songUpload" multiple accept="audio/*">
+      <button class="btn" onclick="addSongs()" style="margin-left:0;">add tracks</button>
+      <br><br>
+      <!-- track list container with drag-and-drop -->
+      <div id="trackList" class="track-list"></div>
+    </div>
+  </div>
 </div>
 
+<!-- player bar -->
 <div class="player">
-<div id="nowPlaying">no track</div>
-<audio id="audioPlayer" controls></audio>
+<div id="nowPlaying">⚬ no track playing</div>
+<audio id="audioPlayer" controls style="width:100%; margin-top:8px;"></audio>
+</div>
+
+<!-- CUSTOMIZATION PANEL WITH REACTIVITY SLIDER (saved settings) -->
+<div class="custom-panel" id="panel">
+<button class="close-btn" onclick="togglePanel()">×</button>
+<h3>particle lab</h3>
+
+<label>reactivity <span id="reactValue" class="value-badge">0.50</span></label>
+<input type="range" id="reactivitySlider" min="0" max="1.0" step="0.01" value="0.50">
+
+<label>particle count <span id="countValue" class="value-badge">5000</span></label>
+<input type="range" id="countSlider" min="300" max="10000" step="50" value="5000">
+
+<button class="btn" onclick="resetParticles()">reshuffle swarm</button>
+<p style="font-size:0.8rem; opacity:0.6; margin-top:20px;">• particles wrap around edges<br>• reactivity 0.5 = your perfect subtle push (0.0009×raw)<br>• settings auto-save</p>
 </div>
 
 <script>
-// ===== API URL HELPER =====
-function getApiUrl(endpoint) {
-  // Always use relative path - same server
-  return endpoint;
-}
-
-// ===== DATABASE =====
-let db;
-let currentAlbumId = null;
-
-const request = indexedDB.open("appDB", 1);
-
-request.onupgradeneeded = e => {
-  db = e.target.result;
-  db.createObjectStore("albums", { keyPath: "id", autoIncrement: true });
-};
-
-request.onsuccess = e => {
-  db = e.target.result;
-  checkAuth();
-};
-
-// ===== AUTH =====
+// ===== AUTHENTICATION =====
 
 async function handleLogin() {
   const email = document.getElementById('authEmail').value;
@@ -279,7 +835,7 @@ async function handleLogin() {
   }
 
   try {
-    const res = await fetch(getApiUrl('/api/login'), {
+    const res = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -326,7 +882,7 @@ async function handleSignup() {
   }
 
   try {
-    const res = await fetch(getApiUrl('/api/signup'), {
+    const res = await fetch('/api/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, confirmPassword: confirm })
@@ -381,116 +937,633 @@ function checkAuth() {
   }
 }
 
-// ===== FUNCTIONS =====
-function getAll(cb) {
-  db.transaction("albums", "readonly")
-    .objectStore("albums")
-    .getAll().onsuccess = e => cb(e.target.result);
+// ========== IndexedDB and music app ==========
+let db;
+let currentAlbumId = null;
+let currentAlbumTracks = [];
+let currentTrackIndex = -1;
+let playQueue = [];
+const request = indexedDB.open("PiratedUntitledDB", 1);
+request.onupgradeneeded = e => {
+  db = e.target.result;
+  db.createObjectStore("albums", { keyPath: "id", autoIncrement: true });
+  // also create a store for particle settings
+  if (!db.objectStoreNames.contains("settings")) {
+    db.createObjectStore("settings");
+  }
+};
+request.onsuccess = e => {
+  db = e.target.result;
+  checkAuth();
+  loadParticleSettings();
+};
+
+// ========== PARTICLE SETTINGS STORAGE ==========
+function saveParticleSettings(reactivity, count) {
+  if (!db) return;
+  const tx = db.transaction("settings", "readwrite");
+  tx.objectStore("settings").put(reactivity, "reactivity");
+  tx.objectStore("settings").put(count, "particleCount");
 }
 
+function loadParticleSettings() {
+  if (!db) return;
+  const tx = db.transaction("settings", "readonly");
+  const getReact = tx.objectStore("settings").get("reactivity");
+  const getCount = tx.objectStore("settings").get("particleCount");
+
+  getReact.onsuccess = () => {
+    if (getReact.result !== undefined) {
+      reactivityFactor = parseFloat(getReact.result);
+      reactSlider.value = reactivityFactor;
+      reactSpan.innerText = reactivityFactor.toFixed(2);
+    }
+  };
+  getCount.onsuccess = () => {
+    if (getCount.result !== undefined) {
+      targetParticleCount = parseInt(getCount.result, 10);
+      countSlider.value = targetParticleCount;
+      countSpan.innerText = targetParticleCount;
+      resizeParticles(targetParticleCount);
+    } else {
+      targetParticleCount = 5000;
+      countSlider.value = 5000;
+      countSpan.innerText = "5000";
+      resizeParticles(5000);
+    }
+  };
+}
+
+// ========== Album functions ==========
+function getAll(cb) {
+  const tx = db.transaction("albums", "readonly");
+  tx.objectStore("albums").getAll().onsuccess = e => cb(e.target.result);
+}
 function save(album) {
-  db.transaction("albums", "readwrite")
-    .objectStore("albums")
-    .put(album);
+  db.transaction("albums", "readwrite").objectStore("albums").put(album);
 }
 
 function createAlbum() {
   db.transaction("albums", "readwrite")
     .objectStore("albums")
-    .add({ name: "untitled", tracks: [] })
+    .add({ name: "untitled project", cover: null, tracks: [] })
     .onsuccess = renderHome;
+}
+
+function deleteAlbum(albumId) {
+  if (albumId === currentAlbumId) {
+    goHome();
+  }
+  
+  db.transaction("albums", "readwrite")
+    .objectStore("albums")
+    .delete(albumId)
+    .onsuccess = () => {
+      renderHome();
+      if (albumId !== currentAlbumId) {
+        populateAlbumMenu();
+      }
+    };
 }
 
 function renderHome() {
   getAll(albums => {
     const home = document.getElementById("home");
     home.innerHTML = "";
-
     albums.forEach(album => {
-      const div = document.createElement("div");
-      div.className = "album-card";
-      div.onclick = () => openAlbum(album.id);
-
+      const card = document.createElement("div");
+      card.className = "album-card";
+      card.onclick = () => openAlbum(album.id);
       const img = document.createElement("img");
-      img.src = "";
-      div.appendChild(img);
-
-      const p = document.createElement("p");
-      p.textContent = album.name;
-      div.appendChild(p);
-
-      home.appendChild(div);
+      img.src = album.cover || "";
+      card.appendChild(img);
+      const name = document.createElement("p");
+      name.textContent = album.name;
+      card.appendChild(name);
+      home.appendChild(card);
     });
   });
 }
 
 function openAlbum(id) {
   currentAlbumId = id;
-
   document.getElementById("home").style.display = "none";
   document.getElementById("albumPage").style.display = "block";
-
+  
   db.transaction("albums", "readonly")
     .objectStore("albums")
     .get(id).onsuccess = e => {
       const album = e.target.result;
-      document.getElementById("albumTitle").textContent = album.name;
-
+      currentAlbumTracks = album.tracks;
+      const title = document.getElementById("albumTitle");
+      title.textContent = album.name;
+      title.onclick = () => {
+        const newName = prompt("Rename album:", album.name);
+        if (newName) { album.name = newName; save(album); openAlbum(id); }
+      };
+      const cover = document.getElementById("albumCover");
+      cover.src = album.cover || "";
+      cover.onclick = () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/*";
+        input.onchange = e => {
+          const reader = new FileReader();
+          reader.onload = ev => {
+            album.cover = ev.target.result;
+            save(album);
+            openAlbum(id);
+          };
+          reader.readAsDataURL(e.target.files[0]);
+        };
+        input.click();
+      };
+      
       renderTracks(album);
     };
+}
+
+function toggleAlbumMenu() {
+  const menu = document.getElementById("albumMenu");
+  const isVisible = menu.style.display !== "none";
+  
+  if (isVisible) {
+    menu.style.display = "none";
+  } else {
+    populateAlbumMenu();
+    menu.style.display = "block";
+    
+    setTimeout(() => {
+      const closeMenu = (e) => {
+        if (!menu.contains(e.target) && !e.target.closest('.btn')) {
+          menu.style.display = "none";
+          document.removeEventListener('click', closeMenu);
+        }
+      };
+      document.addEventListener('click', closeMenu);
+    }, 10);
+  }
+}
+
+function populateAlbumMenu() {
+  const menu = document.getElementById("albumMenu");
+  const list = menu.querySelector(".album-list-vertical") || document.createElement("div");
+  list.className = "album-list-vertical";
+  list.innerHTML = "";
+  
+  getAll(albums => {
+    albums.forEach(album => {
+      const item = document.createElement("div");
+      item.className = "album-item-vertical";
+      if (album.id === currentAlbumId) {
+        item.classList.add("current");
+      }
+      
+      item.onclick = () => {
+        if (album.id !== currentAlbumId) {
+          openAlbum(album.id);
+        }
+        menu.style.display = "none";
+      };
+      
+      const img = document.createElement("img");
+      img.src = album.cover || "";
+      item.appendChild(img);
+      
+      const info = document.createElement("div");
+      info.className = "album-info";
+      
+      const name = document.createElement("div");
+      name.className = "album-name";
+      name.textContent = album.name;
+      info.appendChild(name);
+      
+      const tracks = document.createElement("div");
+      tracks.className = "album-tracks";
+      tracks.textContent = `${album.tracks ? album.tracks.length : 0} tracks`;
+      info.appendChild(tracks);
+      
+      item.appendChild(info);
+      
+      const deleteBtn = document.createElement("button");
+      deleteBtn.className = "delete-album-btn";
+      deleteBtn.textContent = "×";
+      deleteBtn.onclick = (e) => {
+        e.stopPropagation();
+        if (confirm(`Delete album "${album.name}"? This will permanently remove all tracks.`)) {
+          deleteAlbum(album.id);
+        }
+      };
+      item.appendChild(deleteBtn);
+      
+      list.appendChild(item);
+    });
+    
+    menu.innerHTML = "";
+    menu.appendChild(list);
+  });
+}
+
+function goHome() {
+  document.getElementById("albumPage").style.display = "none";
+  document.getElementById("home").style.display = "block";
+  
+  renderHome();
+  
+  currentAlbumId = null;
+  
+  const existingMenu = document.querySelector('.track-menu');
+  if (existingMenu) existingMenu.remove();
+  
+  document.getElementById("albumMenu").style.display = "none";
 }
 
 function renderTracks(album) {
   const list = document.getElementById("trackList");
   list.innerHTML = "";
-
-  album.tracks.forEach((t, i) => {
+  
+  album.tracks.forEach((t, index) => {
     const div = document.createElement("div");
-    div.textContent = t.name;
-    div.onclick = () => playTrack(t);
+    div.className = "track";
+    
+    const nameSpan = document.createElement("span");
+    nameSpan.textContent = (index + 1) + ". " + t.name;
+    nameSpan.onclick = () => playTrack(index);
+    
+    const menuBtn = document.createElement("div");
+    menuBtn.className = "remove-btn";
+    menuBtn.textContent = "•••";
+    menuBtn.onclick = (e) => {
+      e.stopPropagation();
+      showTrackMenu(e.target, album, index);
+    };
+    
+    div.appendChild(nameSpan);
+    div.appendChild(menuBtn);
     list.appendChild(div);
   });
 }
 
-function addSongs() {
-  const files = document.getElementById("songUpload").files;
+function showTrackMenu(button, album, trackIndex) {
+  const existingMenu = document.querySelector('.track-menu');
+  if (existingMenu) existingMenu.remove();
+  
+  const menu = document.createElement('div');
+  menu.className = 'track-menu';
+  
+  const rect = button.getBoundingClientRect();
+  menu.style.left = rect.right + 10 + 'px';
+  menu.style.top = rect.top - 10 + 'px';
+  
+  menu.innerHTML = `
+    <h4>Track Options</h4>
+    <div class="position-info">Your song is in position ${trackIndex + 1}</div>
+    <input type="number" id="positionInput" min="1" max="${album.tracks.length}" value="${trackIndex + 1}" placeholder="New position">
+    <button class="menu-btn" onclick="moveTrack(${trackIndex}, this)">Move</button>
+    <button class="menu-btn delete-btn" onclick="deleteTrack(${trackIndex}, this)">Delete</button>
+    <button class="menu-btn" onclick="addToQueue(${trackIndex}, this)">Add to Queue</button>
+    <button class="menu-btn" onclick="showQueue()">View Queue</button>
+  `;
+  
+  document.body.appendChild(menu);
+  
+  setTimeout(() => {
+    document.getElementById('positionInput').focus();
+    document.getElementById('positionInput').select();
+  }, 10);
+  
+  const closeMenu = (e) => {
+    if (!menu.contains(e.target) && e.target !== button) {
+      menu.remove();
+      document.removeEventListener('click', closeMenu);
+    }
+  };
+  setTimeout(() => document.addEventListener('click', closeMenu), 10);
+}
 
+function moveTrack(fromIndex, button) {
+  const menu = button.closest('.track-menu');
+  const newPosition = parseInt(document.getElementById('positionInput').value) - 1;
+  const albumId = currentAlbumId;
+  
   db.transaction("albums", "readwrite")
     .objectStore("albums")
-    .get(currentAlbumId).onsuccess = e => {
-      const album = e.target.result;
-
-      for (let file of files) {
-        album.tracks.push({
-          name: file.name,
-          url: URL.createObjectURL(file)
-        });
+    .get(albumId).onsuccess = (event) => {
+      const album = event.target.result;
+      if (!album) return;
+      
+      if (newPosition < 0 || newPosition >= album.tracks.length || newPosition === fromIndex) {
+        menu.remove();
+        return;
       }
-
+      
+      const tracks = album.tracks;
+      const [removed] = tracks.splice(fromIndex, 1);
+      tracks.splice(newPosition, 0, removed);
+      
       save(album);
-      openAlbum(currentAlbumId);
+      renderTracks(album);
+      menu.remove();
     };
 }
 
-function playTrack(track) {
-  const audio = document.getElementById("audioPlayer");
-  audio.src = track.url;
-  audio.play();
-
-  document.getElementById("nowPlaying").textContent = track.name;
+function deleteTrack(trackIndex, button) {
+  const menu = button.closest('.track-menu');
+  const albumId = currentAlbumId;
+  
+  db.transaction("albums", "readwrite")
+    .objectStore("albums")
+    .get(albumId).onsuccess = (event) => {
+      const album = event.target.result;
+      if (!album) return;
+      
+      album.tracks.splice(trackIndex, 1);
+      
+      save(album);
+      renderTracks(album);
+      menu.remove();
+    };
 }
 
-function goHome() {
-  document.getElementById("albumPage").style.display = "none";
-  document.getElementById("home").style.display = "grid";
-  renderHome();
+function addToQueue(trackIndex, button) {
+  playQueue.push(trackIndex);
+  button.textContent = "Added to Queue";
+  setTimeout(() => {
+    button.closest('.track-menu').remove();
+  }, 1000);
 }
 
-// ===== SERVICE WORKER =====
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/untitled123111/service-worker.js");
+function showQueue() {
+  const existing = document.querySelector('.queue-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.className = 'queue-modal';
+
+  let html = `
+    <button class="queue-close" onclick="this.parentElement.remove()">×</button>
+    <h3>Play Queue</h3>
+  `;
+
+  if (playQueue.length === 0) {
+    html += '<p>No tracks in queue</p>';
+  } else {
+    playQueue.forEach((index, queueIndex) => {
+      const track = currentAlbumTracks[index];
+      html += `
+        <div class="queue-item">
+          <span class="track-name">${track.name}</span>
+          <div class="queue-controls">
+            <button onclick="removeFromQueue(${queueIndex})">Remove</button>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  modal.innerHTML = html;
+  document.body.appendChild(modal);
+
+  document.querySelector('.track-menu').remove();
 }
+
+function removeFromQueue(queueIndex) {
+  playQueue.splice(queueIndex, 1);
+  showQueue();
+}
+
+function addSongs() {
+  db.transaction("albums", "readonly")
+    .objectStore("albums")
+    .get(currentAlbumId).onsuccess = e => {
+      const album = e.target.result;
+      Array.from(document.getElementById("songUpload").files)
+        .forEach(file => album.tracks.push({ name: file.name, blob: file }));
+      save(album);
+      renderTracks(album);
+    };
+}
+
+function playTrack(index) {
+  const track = currentAlbumTracks[index];
+  const player = document.getElementById("audioPlayer");
+  player.src = URL.createObjectURL(track.blob);
+  player.play();
+  document.getElementById("nowPlaying").innerText = "● " + track.name;
+  currentTrackIndex = index;
+}
+
+function playNext() {
+  if (playQueue.length > 0) {
+    const index = playQueue.shift();
+    playTrack(index);
+  } else {
+    if (currentTrackIndex >= 0 && currentTrackIndex < currentAlbumTracks.length - 1) {
+      playTrack(currentTrackIndex + 1);
+    }
+  }
+}
+
+// ========== ADVANCED PARTICLE SYSTEM ==========
+const canvas = document.getElementById('particleCanvas');
+const ctx = canvas.getContext('2d');
+let width, height;
+let particles = [];
+let targetParticleCount = 5000;
+let reactivityFactor = 0.50;
+let audioContext = null;
+let analyser = null;
+let source = null;
+let audioPlayer = document.getElementById('audioPlayer');
+audioPlayer.addEventListener('ended', playNext);
+
+const reactSlider = document.getElementById('reactivitySlider');
+const reactSpan = document.getElementById('reactValue');
+const countSlider = document.getElementById('countSlider');
+const countSpan = document.getElementById('countValue');
+
+reactSlider.addEventListener('input', (e) => {
+  reactivityFactor = parseFloat(e.target.value);
+  reactSpan.innerText = reactivityFactor.toFixed(2);
+  saveParticleSettings(reactivityFactor, targetParticleCount);
+});
+
+countSlider.addEventListener('input', (e) => {
+  targetParticleCount = parseInt(e.target.value, 10);
+  countSpan.innerText = targetParticleCount;
+  resizeParticles(targetParticleCount);
+  saveParticleSettings(reactivityFactor, targetParticleCount);
+});
+
+function resizeParticles(newCount) {
+  if (newCount > particles.length) {
+    for (let i = particles.length; i < newCount; i++) {
+      particles.push(createParticle());
+    }
+  } else if (newCount < particles.length) {
+    particles = particles.slice(0, newCount);
+  }
+}
+
+function createParticle() {
+  return {
+    x: Math.random(),
+    y: Math.random(),
+    vx: (Math.random() - 0.5) * 0.002,
+    vy: (Math.random() - 0.5) * 0.002,
+    size: 0.5 + Math.random() * 1.5,
+    opacity: 0.1 + Math.random() * 0.25,
+    fadeSpeed: 0.0006 + Math.random() * 0.003,
+    hueOffset: Math.random() * 360,
+  };
+}
+
+function initParticles(count) {
+  particles = [];
+  for (let i = 0; i < count; i++) {
+    particles.push(createParticle());
+  }
+}
+
+function resizeCanvas() {
+  width = window.innerWidth;
+  height = window.innerHeight;
+  canvas.width = width;
+  canvas.height = height;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+initParticles(targetParticleCount);
+
+function connectAudioAnalyser() {
+  if (audioContext) return;
+  try {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 64;
+    source = audioContext.createMediaElementSource(audioPlayer);
+    source.connect(analyser);
+    analyser.connect(audioContext.destination);
+  } catch (e) {
+    console.warn('Web Audio API not available');
+  }
+}
+audioPlayer.addEventListener('play', () => {
+  if (audioContext && audioContext.state === 'suspended') {
+    audioContext.resume();
+  } else if (!audioContext) {
+    connectAudioAnalyser();
+  }
+});
+
+function animate() {
+  if (!width || !height) return;
+
+  let rawLevel = 0;
+  if (analyser) {
+    const data = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(data);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) sum += data[i];
+    rawLevel = sum / (data.length * 255);
+  }
+
+  let pushFactor = reactivityFactor * 0.0018;
+  let pushLevel = rawLevel * pushFactor;
+
+  ctx.fillStyle = 'rgba(0,0,0,0.02)';
+  ctx.fillRect(0, 0, width, height);
+
+  const cx = width * 0.5;
+  const cy = height * 0.5;
+
+  for (let p of particles) {
+    let dx = cx - p.x * width;
+    let dy = cy - p.y * height;
+    let dist = Math.hypot(dx, dy);
+    if (dist < 0.1) dist = 0.1;
+
+    let pullStrength = 0.00015 * Math.min(1.0, dist / 700);
+    let normX = dx / dist;
+    let normY = dy / dist;
+    p.vx += normX * pullStrength;
+    p.vy += normY * pullStrength;
+
+    if (pushLevel > 0.00001) {
+      let outX = (p.x * width - cx) / width;
+      let outY = (p.y * height - cy) / height;
+      let outLen = Math.hypot(outX, outY);
+      if (outLen > 0.001) {
+        outX /= outLen;
+        outY /= outLen;
+        p.vx += outX * pushLevel;
+        p.vy += outY * pushLevel;
+      } else {
+        p.vx += (Math.random() - 0.5) * pushLevel * 0.5;
+        p.vy += (Math.random() - 0.5) * pushLevel * 0.5;
+      }
+    }
+
+    p.vx *= 0.995;
+    p.vy *= 0.995;
+    p.x += p.vx;
+    p.y += p.vy;
+
+    if (p.x < 0.0) p.x = 1.0;
+    if (p.x > 1.0) p.x = 0.0;
+    if (p.y < 0.0) p.y = 1.0;
+    if (p.y > 1.0) p.y = 0.0;
+
+    p.opacity += (Math.random() - 0.5) * p.fadeSpeed;
+    if (rawLevel > 0.02) p.opacity += rawLevel * 0.01 * reactivityFactor;
+    p.opacity = Math.min(0.5, Math.max(0.08, p.opacity));
+
+    const particleX = p.x * width;
+    const particleY = p.y * height;
+    const distToCenter = Math.hypot(particleX - cx, particleY - cy);
+    let hue = (distToCenter * 0.08 + performance.now() * 0.005 + p.hueOffset) % 360;
+    ctx.fillStyle = `hsla(${hue}, ${15 + rawLevel*10}%, ${50 + rawLevel*5}%, ${p.opacity})`;
+    ctx.beginPath();
+    let dynamicSize = p.size * (0.9 + rawLevel * 0.3 * reactivityFactor);
+    ctx.arc(particleX, particleY, dynamicSize, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  requestAnimationFrame(animate);
+}
+animate();
+
+function resetParticles() {
+  initParticles(targetParticleCount);
+}
+window.resetParticles = resetParticles;
+
+function togglePanel() {
+  const panel = document.getElementById("panel");
+  panel.classList.toggle("visible");
+}
+
+// Expose functions globally
+window.goHome = goHome;
+window.togglePanel = togglePanel;
+window.createAlbum = createAlbum;
+window.deleteAlbum = deleteAlbum;
+window.addSongs = addSongs;
+window.resetParticles = resetParticles;
+window.moveTrack = moveTrack;
+window.deleteTrack = deleteTrack;
+window.addToQueue = addToQueue;
+window.showQueue = showQueue;
+window.removeFromQueue = removeFromQueue;
+window.switchAlbum = switchAlbum;
+window.toggleAlbumMenu = toggleAlbumMenu;
+window.setReactive = function() {};
+window.clearBackground = function() { resetParticles(); };
+window.logout = logout;
+window.handleLogin = handleLogin;
+window.handleSignup = handleSignup;
+window.switchToSignup = switchToSignup;
+window.switchToLogin = switchToLogin;
 </script>
-
 </body>
 </html>

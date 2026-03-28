@@ -11,14 +11,7 @@ const SECRET_KEY = process.env.SECRET_KEY || 'your-secret-key-change-this-in-pro
 
 // Middleware - CORS first
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:3000',
-    'https://burgrhama.github.io',
-    'https://burgrhama.github.io/untitled-phone',
-    'https://burgrhama.github.io/untitled-phone/'
-  ],
+  origin: '*',
   credentials: true,
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -33,14 +26,6 @@ app.use((err, req, res, next) => {
     return res.status(400).json({ error: 'Invalid JSON' });
   }
   next();
-});
-
-// Static files - serve frontend
-app.use(express.static(path.join(__dirname)));
-
-// Serve index.html for all non-API routes (SPA support)
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Database setup
@@ -63,6 +48,8 @@ function initDB() {
     )
   `);
 }
+
+// ===== API ROUTES FIRST =====
 
 // ===== SIGNUP ROUTE =====
 app.post('/api/signup', async (req, res) => {
@@ -158,8 +145,17 @@ app.get('/api/profile', (req, res) => {
   }
 });
 
+// ===== STATIC FILES & FRONTEND (LAST) =====
+
+// Static files
+app.use(express.static(path.join(__dirname)));
+
+// Serve index.html for all non-API routes (SPA support)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
 // ===== START SERVER =====
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
-  console.log(`GitHub Pages URL: https://burgrhama.github.io/untitled-phone/`);
 });
