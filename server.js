@@ -226,7 +226,8 @@ app.post('/api/upload-track', verifyToken, upload.single('track'), (req, res) =>
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  const url = `/uploads/${encodeURIComponent(req.file.filename)}`;
+  const origin = `${req.protocol}://${req.get('host')}`;
+  const url = `${origin}/uploads/${encodeURIComponent(req.file.filename)}`;
   res.json({ name: req.file.originalname, url });
 });
 
