@@ -182,6 +182,16 @@ function renderTracks(album) {
         const div = document.createElement("div");
         div.className = "track";
 
+        const playBtn = document.createElement("button");
+        playBtn.className = "track-play-btn";
+        playBtn.setAttribute("aria-label", "Play track");
+        playBtn.textContent = "▶";
+        playBtn.onclick = e => {
+            e.stopPropagation();
+            playTrack(index);
+        };
+        div.appendChild(playBtn);
+
         const titleSpan = document.createElement("span");
         titleSpan.textContent = `${index + 1}. ${track.name}`;
         titleSpan.onclick = e => {
@@ -191,8 +201,7 @@ function renderTracks(album) {
         div.appendChild(titleSpan);
 
         const optionsBtn = document.createElement("button");
-        optionsBtn.className = "track-options";
-        optionsBtn.setAttribute("aria-label", "Track options");
+        optionsBtn.className = "track-options";        optionsBtn.setAttribute("aria-label", "Track options");
         optionsBtn.textContent = "⋮";
         optionsBtn.onclick = e => {
             e.stopPropagation();
