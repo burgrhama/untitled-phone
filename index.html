@@ -1384,6 +1384,12 @@ function openAlbum(id) {
       };
       const cover = document.getElementById("albumCover");
       cover.src = album.cover || "";
+
+      const albumPlayBtn = document.getElementById("albumPlayButton");
+      if (albumPlayBtn) {
+        albumPlayBtn.disabled = !album.tracks || album.tracks.length === 0;
+      }
+
       cover.onclick = () => {
         const input = document.createElement("input");
         input.type = "file";
@@ -1507,10 +1513,14 @@ function renderTracks(album) {
   album.tracks.forEach((t, index) => {
     const div = document.createElement("div");
     div.className = "track";
+    div.onclick = () => playTrack(index);
     
     const nameSpan = document.createElement("span");
     nameSpan.textContent = (index + 1) + ". " + t.name;
-    nameSpan.onclick = () => playTrack(index);
+    nameSpan.onclick = (e) => {
+      e.stopPropagation();
+      playTrack(index);
+    };
     
     const menuBtn = document.createElement("div");
     menuBtn.className = "remove-btn";
@@ -1676,6 +1686,14 @@ function playTrack(index) {
   player.play();
   document.getElementById("nowPlaying").innerText = "● " + track.name;
   currentTrackIndex = index;
+}
+
+function playAlbumStart() {
+  if (!currentAlbumTracks || currentAlbumTracks.length === 0) {
+    alert("There are no tracks to play in this album.");
+    return;
+  }
+  playTrack(0);
 }
 
 function playNext() {
