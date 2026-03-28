@@ -13,12 +13,12 @@ const SECRET_KEY = process.env.SECRET_KEY || 'your-secret-key-change-this-in-pro
 app.use(cors({
   origin: '*',
   credentials: true,
-  methods: ['GET', 'POST', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Then JSON parser
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
 
 // Error handler for JSON parsing
 app.use((err, req, res, next) => {
@@ -47,15 +47,42 @@ function initDB() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  db.run(`
+    CREATE TABLE IF NOT EXISTS albums (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      cover LONGTEXT,
+      tracks LONGTEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
 }
 
-// ===== API ROUTES FIRST =====
+// ===== AUTH MIDDLEWARE =====
+function verifyToken(req, res, next) {
+  const token = req.headers.authorization?.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ error: 'No token provided' });
+  }
+
+  try {
+    const decoded = jwt.verify(token, SECRET_KEY);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    res.status(401).json({ error: 'Invalid token' });
+  }
+}
 
 // ===== SIGNUP ROUTE =====
 app.post('/api/signup', async (req, res) => {
   const { email, password, confirmPassword } = req.body;
 
-  // Validation
   if (!email || !password || !confirmPassword) {
     return res.status(400).json({ error: 'All fields required' });
   }
@@ -68,7 +95,6 @@ app.post('/api/signup', async (req, res) => {
     return res.status(400).json({ error: 'Password must be at least 6 characters' });
   }
 
-  // Validate email format
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   if (!emailRegex.test(email)) {
     return res.status(400).json({ error: 'Invalid email format' });
@@ -121,7 +147,7 @@ app.post('/api/login', (req, res) => {
       }
 
       const token = jwt.sign({ email: user.email, id: user.id }, SECRET_KEY, { expiresIn: '7d' });
-      res.json({ message: 'Login successful', token, email: user.email });
+      res.json({ message: 'Login successful', token, email: user.email, id: user.id });
     } catch (error) {
       console.error('Password compare error:', error);
       res.status(500).json({ error: 'Server error' });
@@ -129,20 +155,93 @@ app.post('/api/login', (req, res) => {
   });
 });
 
-// ===== PROTECTED ROUTE (Example) =====
-app.get('/api/profile', (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1];
+// ===== GET ALL ALBUMS FOR USER =====
+app.get('/api/albums', verifyToken, (req, res) => {
+  db.all(
+    'SELECT id, name, cover, tracks FROM albums WHERE user_id = (SELECT id FROM users WHERE email = ?)',
+    [req.user.email],
+    (err, albums) => {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Database error' });
+      }
 
-  if (!token) {
-    return res.status(401).json({ error: 'No token provided' });
-  }
+      // Parse tracks JSON
+      const parsedAlbums = albums.map(album => ({
+        id: album.id,
+        name: album.name,
+        cover: album.cover,
+        tracks: album.tracks ? JSON.parse(album.tracks) : []
+      }));
 
-  try {
-    const decoded = jwt.verify(token, SECRET_KEY);
-    res.json({ message: 'Profile accessed', email: decoded.email });
-  } catch (error) {
-    res.status(401).json({ error: 'Invalid token' });
-  }
+      res.json(parsedAlbums);
+    }
+  );
+});
+
+// ===== CREATE ALBUM =====
+app.post('/api/albums', verifyToken, (req, res) => {
+  const { name } = req.body;
+
+  db.get('SELECT id FROM users WHERE email = ?', [req.user.email], (err, user) => {
+    if (err || !user) {
+      return res.status(500).json({ error: 'User not found' });
+    }
+
+    db.run(
+      'INSERT INTO albums (user_id, name, tracks) VALUES (?, ?, ?)',
+      [user.id, name || 'untitled project', JSON.stringify([])],
+      function(err) {
+        if (err) {
+          return res.status(500).json({ error: 'Database error' });
+        }
+        res.status(201).json({ id: this.lastID, name: name || 'untitled project', cover: null, tracks: [] });
+      }
+    );
+  });
+});
+
+// ===== UPDATE ALBUM =====
+app.put('/api/albums/:id', verifyToken, (req, res) => {
+  const { name, cover, tracks } = req.body;
+  const albumId = req.params.id;
+
+  db.run(
+    'UPDATE albums SET name = ?, cover = ?, tracks = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = (SELECT id FROM users WHERE email = ?)',
+    [name, cover, JSON.stringify(tracks), albumId, req.user.email],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Album not found' });
+      }
+
+      res.json({ message: 'Album updated' });
+    }
+  );
+});
+
+// ===== DELETE ALBUM =====
+app.delete('/api/albums/:id', verifyToken, (req, res) => {
+  const albumId = req.params.id;
+
+  db.run(
+    'DELETE FROM albums WHERE id = ? AND user_id = (SELECT id FROM users WHERE email = ?)',
+    [albumId, req.user.email],
+    function(err) {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      if (this.changes === 0) {
+        return res.status(404).json({ error: 'Album not found' });
+      }
+
+      res.json({ message: 'Album deleted' });
+    }
+  );
 });
 
 // ===== STATIC FILES & FRONTEND (LAST) =====

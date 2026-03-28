@@ -2,7 +2,16 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="description" content="Music player with authentication and cloud sync">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="untitled">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" type="image/png" href="/icon-192.png" sizes="192x192">
+<link rel="icon" type="image/png" href="/icon-512.png" sizes="512x512">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <title>pirated untitled · drag to reorder</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -852,7 +861,7 @@ async function handleLogin() {
     localStorage.setItem('email', data.email);
     
     document.getElementById('authOverlay').classList.add('hidden');
-    renderHome();
+    syncAlbumsFromServer();
   } catch (e) {
     error.textContent = 'Network error: ' + e.message;
   }
@@ -899,7 +908,7 @@ async function handleSignup() {
     localStorage.setItem('email', data.email);
     
     document.getElementById('authOverlay').classList.add('hidden');
-    renderHome();
+    syncAlbumsFromServer();
   } catch (e) {
     error.textContent = 'Network error: ' + e.message;
   }
@@ -931,7 +940,7 @@ function checkAuth() {
   
   if (token && email) {
     document.getElementById('authOverlay').classList.add('hidden');
-    renderHome();
+    syncAlbumsFromServer(); // Load user's albums from server
   } else {
     document.getElementById('authOverlay').classList.remove('hidden');
   }
@@ -957,6 +966,62 @@ request.onsuccess = e => {
   checkAuth();
   loadParticleSettings();
 };
+
+// ===== SYNC FUNCTIONS =====
+async function syncAlbumsFromServer() {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+
+  try {
+    const res = await fetch('/api/albums', {
+      headers: { 'Authorization': 'Bearer ' + token }
+    });
+
+    if (!res.ok) return;
+
+    const albums = await res.json();
+
+    // Clear local albums and replace with server albums
+    db.transaction("albums", "readwrite")
+      .objectStore("albums")
+      .clear().onsuccess = () => {
+        albums.forEach(album => {
+          db.transaction("albums", "readwrite")
+            .objectStore("albums")
+            .add(album);
+        });
+        renderHome();
+      };
+  } catch (e) {
+    console.error('Sync error:', e);
+  }
+}
+
+async function syncAlbumToServer(album) {
+  const token = localStorage.getItem('token');
+  if (!token) return;
+
+  try {
+    const res = await fetch(`/api/albums/${album.id}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token
+      },
+      body: JSON.stringify({
+        name: album.name,
+        cover: album.cover,
+        tracks: album.tracks
+      })
+    });
+
+    if (!res.ok) {
+      console.error('Sync failed:', await res.json());
+    }
+  } catch (e) {
+    console.error('Sync error:', e);
+  }
+}
 
 // ========== PARTICLE SETTINGS STORAGE ==========
 function saveParticleSettings(reactivity, count) {
@@ -1004,26 +1069,49 @@ function save(album) {
 }
 
 function createAlbum() {
-  db.transaction("albums", "readwrite")
-    .objectStore("albums")
-    .add({ name: "untitled project", cover: null, tracks: [] })
-    .onsuccess = renderHome;
+  const token = localStorage.getItem('token');
+  if (!token) return;
+
+  fetch('/api/albums', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + token
+    },
+    body: JSON.stringify({ name: 'untitled project' })
+  })
+  .then(res => res.json())
+  .then(album => {
+    db.transaction("albums", "readwrite")
+      .objectStore("albums")
+      .add(album)
+      .onsuccess = renderHome;
+  })
+  .catch(e => console.error('Create album error:', e));
 }
 
 function deleteAlbum(albumId) {
-  if (albumId === currentAlbumId) {
-    goHome();
-  }
-  
-  db.transaction("albums", "readwrite")
-    .objectStore("albums")
-    .delete(albumId)
-    .onsuccess = () => {
-      renderHome();
-      if (albumId !== currentAlbumId) {
-        populateAlbumMenu();
-      }
-    };
+  const token = localStorage.getItem('token');
+  if (!token) return;
+
+  fetch(`/api/albums/${albumId}`, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer ' + token }
+  })
+  .then(() => {
+    db.transaction("albums", "readwrite")
+      .objectStore("albums")
+      .delete(albumId)
+      .onsuccess = () => {
+        renderHome();
+        if (albumId === currentAlbumId) {
+          goHome();
+        } else {
+          populateAlbumMenu();
+        }
+      };
+  })
+  .catch(e => console.error('Delete album error:', e));
 }
 
 function renderHome() {
@@ -1059,7 +1147,12 @@ function openAlbum(id) {
       title.textContent = album.name;
       title.onclick = () => {
         const newName = prompt("Rename album:", album.name);
-        if (newName) { album.name = newName; save(album); openAlbum(id); }
+        if (newName) {
+          album.name = newName;
+          save(album);
+          syncAlbumToServer(album);
+          openAlbum(id);
+        }
       };
       const cover = document.getElementById("albumCover");
       cover.src = album.cover || "";
@@ -1072,6 +1165,7 @@ function openAlbum(id) {
           reader.onload = ev => {
             album.cover = ev.target.result;
             save(album);
+            syncAlbumToServer(album);
             openAlbum(id);
           };
           reader.readAsDataURL(e.target.files[0]);
@@ -1262,6 +1356,7 @@ function moveTrack(fromIndex, button) {
       tracks.splice(newPosition, 0, removed);
       
       save(album);
+      syncAlbumToServer(album);
       renderTracks(album);
       menu.remove();
     };
@@ -1280,6 +1375,7 @@ function deleteTrack(trackIndex, button) {
       album.tracks.splice(trackIndex, 1);
       
       save(album);
+      syncAlbumToServer(album);
       renderTracks(album);
       menu.remove();
     };
@@ -1340,6 +1436,7 @@ function addSongs() {
       Array.from(document.getElementById("songUpload").files)
         .forEach(file => album.tracks.push({ name: file.name, blob: file }));
       save(album);
+      syncAlbumToServer(album);
       renderTracks(album);
     };
 }
@@ -1564,6 +1661,13 @@ window.handleLogin = handleLogin;
 window.handleSignup = handleSignup;
 window.switchToSignup = switchToSignup;
 window.switchToLogin = switchToLogin;
+
+// ===== SERVICE WORKER REGISTRATION =====
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/service-worker.js')
+    .then(reg => console.log('Service Worker registered'))
+    .catch(err => console.log('Service Worker registration failed:', err));
+}
 </script>
 </body>
 </html>
