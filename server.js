@@ -16,11 +16,11 @@ app.use(cors({
     'http://localhost:3001',
     'http://127.0.0.1:3000',
     'https://burgrhama.github.io',
-    'https://burgrhama.github.io/untitled-phone/',
-    'https://burgrhama.github.io/untitled-phone'
+    'https://burgrhama.github.io/untitled-phone',
+    'https://burgrhama.github.io/untitled-phone/'
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
@@ -35,8 +35,13 @@ app.use((err, req, res, next) => {
   next();
 });
 
-// Static files
+// Static files - serve frontend
 app.use(express.static(path.join(__dirname)));
+
+// Serve index.html for all non-API routes (SPA support)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // Database setup
 const db = new sqlite3.Database('./users.db', (err) => {

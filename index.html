@@ -244,13 +244,8 @@ header h1 {
 <script>
 // ===== API URL HELPER =====
 function getApiUrl(endpoint) {
-  // If on GitHub Pages
-  if (window.location.hostname.includes('github.io')) {
-    // Replace with your actual backend URL after deploying to Render
-    return 'https://untitled-phone-api.onrender.com' + endpoint;
-  }
-  // For localhost
-  return 'http://localhost:3000' + endpoint;
+  // Always use relative path - same server
+  return endpoint;
 }
 
 // ===== DATABASE =====
@@ -284,8 +279,7 @@ async function handleLogin() {
   }
 
   try {
-    const apiUrl = getApiUrl('/api/login');
-    const res = await fetch(apiUrl, {
+    const res = await fetch(getApiUrl('/api/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password })
@@ -332,8 +326,7 @@ async function handleSignup() {
   }
 
   try {
-    const apiUrl = getApiUrl('/api/signup');
-    const res = await fetch(apiUrl, {
+    const res = await fetch(getApiUrl('/api/signup'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password, confirmPassword: confirm })
