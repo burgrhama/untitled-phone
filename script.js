@@ -181,6 +181,7 @@ function renderTracks(album) {
     album.tracks.forEach((track, index) => {
         const div = document.createElement("div");
         div.className = "track";
+        div.onclick = () => playTrack(index);
 
         const playBtn = document.createElement("button");
         playBtn.className = "track-play-btn";
