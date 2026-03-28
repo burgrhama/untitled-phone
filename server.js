@@ -276,6 +276,9 @@ app.delete('/api/albums/:id', verifyToken, (req, res) => {
 
 // ===== STATIC FILES & FRONTEND (LAST) =====
 
+// Serve uploaded files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Static files
 app.use(express.static(path.join(__dirname)));
 
