@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+<title>pirated untitled · drag to reorder</title>
+
+<!-- PWA -->
+<link rel="manifest" href="/untitled123111/manifest.json">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #000;
+  color: #eee;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* canvas */
+#particleCanvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+}
+
+/* header */
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+}
+
+header h1 {
+  font-size: 28px;
+}
+
+.btn {
+  background: #222;
+  color: #fff;
+  border: 1px solid #444;
+  padding: 10px 16px;
+  border-radius: 20px;
+  cursor: pointer;
+}
+
+/* grid */
+.album-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 140px);
+  gap: 20px;
+  padding: 20px;
+}
+
+.album-card img {
+  width: 100%;
+  border-radius: 12px;
+}
+
+/* album view */
+.album-view {
+  display: none;
+  padding: 20px;
+}
+
+.cover-large {
+  width: 200px;
+  height: 200px;
+  border-radius: 16px;
+}
+
+/* player */
+.player {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  background: #111;
+  padding: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="particleCanvas"></canvas>
+
+<header>
+<h1 onclick="goHome()">pirated untitled</h1>
+<div>
+<button class="btn" onclick="createAlbum()">make an album</button>
+</div>
+</header>
+
+<div id="home" class="album-grid"></div>
+
+<div id="albumPage" class="album-view">
+  <img id="albumCover" class="cover-large">
+  <h2 id="albumTitle"></h2>
+
+  <input type="file" id="songUpload" multiple accept="audio/*">
+  <button class="btn" onclick="addSongs()">add tracks</button>
+
+  <div id="trackList"></div>
+</div>
+
+<div class="player">
+<div id="nowPlaying">no track</div>
+<audio id="audioPlayer" controls></audio>
+</div>
+
+<script>
+// ===== DATABASE =====
+let db;
+let currentAlbumId = null;
+
+const request = indexedDB.open("appDB", 1);
+
+request.onupgradeneeded = e => {
+  db = e.target.result;
+  db.createObjectStore("albums", { keyPath: "id", autoIncrement: true });
+};
+
+request.onsuccess = e => {
+  db = e.target.result;
+  renderHome();
+};
+
+// ===== FUNCTIONS =====
+function getAll(cb) {
+  db.transaction("albums", "readonly")
+    .objectStore("albums")
+    .getAll().onsuccess = e => cb(e.target.result);
+}
+
+function save(album) {
+  db.transaction("albums", "readwrite")
+    .objectStore("albums")
+    .put(album);
+}
+
+function createAlbum() {
+  db.transaction("albums", "readwrite")
+    .objectStore("albums")
+    .add({ name: "untitled", tracks: [] })
+    .onsuccess = renderHome;
+}
+
+function renderHome() {
+  getAll(albums => {
+    const home = document.getElementById("home");
+    home.innerHTML = "";
+
+    albums.forEach(album => {
+      const div = document.createElement("div");
+      div.className = "album-card";
+      div.onclick = () => openAlbum(album.id);
+
+      const img = document.createElement("img");
+      img.src = "";
+      div.appendChild(img);
+
+      const p = document.createElement("p");
+      p.textContent = album.name;
+      div.appendChild(p);
+
+      home.appendChild(div);
+    });
+  });
+}
+
+function openAlbum(id) {
+  currentAlbumId = id;
+
+  document.getElementById("home").style.display = "none";
+  document.getElementById("albumPage").style.display = "block";
+
+  db.transaction("albums", "readonly")
+    .objectStore("albums")
+    .get(id).onsuccess = e => {
+      const album = e.target.result;
+      document.getElementById("albumTitle").textContent = album.name;
+
+      renderTracks(album);
+    };
+}
+
+function renderTracks(album) {
+  const list = document.getElementById("trackList");
+  list.innerHTML = "";
+
+  album.tracks.forEach((t, i) => {
+    const div = document.createElement("div");
+    div.textContent = t.name;
+    div.onclick = () => playTrack(t);
+    list.appendChild(div);
+  });
+}
+
+function addSongs() {
+  const files = document.getElementById("songUpload").files;
+
+  db.transaction("albums", "readwrite")
+    .objectStore("albums")
+    .get(currentAlbumId).onsuccess = e => {
+      const album = e.target.result;
+
+      for (let file of files) {
+        album.tracks.push({
+          name: file.name,
+          url: URL.createObjectURL(file)
+        });
+      }
+
+      save(album);
+      openAlbum(currentAlbumId);
+    };
+}
+
+function playTrack(track) {
+  const audio = document.getElementById("audioPlayer");
+  audio.src = track.url;
+  audio.play();
+
+  document.getElementById("nowPlaying").textContent = track.name;
+}
+
+function goHome() {
+  document.getElementById("albumPage").style.display = "none";
+  document.getElementById("home").style.display = "grid";
+  renderHome();
+}
+
+// ===== SERVICE WORKER =====
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/untitled123111/service-worker.js");
+}
+</script>
+
+</body>
+</html>
