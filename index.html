@@ -979,18 +979,42 @@ async function syncAlbumsFromServer() {
 
     if (!res.ok) return;
 
-    const albums = await res.json();
+    const serverAlbums = await res.json();
 
-    // Clear local albums and replace with server albums
-    db.transaction("albums", "readwrite")
+    // Get current local albums
+    db.transaction("albums", "readonly")
       .objectStore("albums")
-      .clear().onsuccess = () => {
-        albums.forEach(album => {
-          db.transaction("albums", "readwrite")
-            .objectStore("albums")
-            .add(album);
+      .getAll().onsuccess = (e) => {
+        const localAlbums = e.target.result;
+        const localMap = new Map(localAlbums.map(a => [a.id, a]));
+
+        // Merge: keep local tracks (blobs), update metadata from server
+        const mergedAlbums = serverAlbums.map(serverAlbum => {
+          const localAlbum = localMap.get(serverAlbum.id);
+          if (localAlbum && localAlbum.tracks.length > 0) {
+            // Keep local tracks (they have blobs), update name and cover from server
+            return {
+              id: serverAlbum.id,
+              name: serverAlbum.name,
+              cover: serverAlbum.cover,
+              tracks: localAlbum.tracks
+            };
+          }
+          // New album from server
+          return serverAlbum;
         });
-        renderHome();
+
+        // Clear and reload
+        db.transaction("albums", "readwrite")
+          .objectStore("albums")
+          .clear().onsuccess = () => {
+            mergedAlbums.forEach(album => {
+              db.transaction("albums", "readwrite")
+                .objectStore("albums")
+                .add(album);
+            });
+            renderHome();
+          };
       };
   } catch (e) {
     console.error('Sync error:', e);
@@ -1002,6 +1026,12 @@ async function syncAlbumToServer(album) {
   if (!token) return;
 
   try {
+    // Convert blobs to base64 for server storage
+    const tracksForServer = album.tracks.map(track => ({
+      name: track.name,
+      blob: track.blob ? 'blob_placeholder' : null // Don't send blob to server
+    }));
+
     const res = await fetch(`/api/albums/${album.id}`, {
       method: 'PUT',
       headers: {
@@ -1011,7 +1041,7 @@ async function syncAlbumToServer(album) {
       body: JSON.stringify({
         name: album.name,
         cover: album.cover,
-        tracks: album.tracks
+        tracks: tracksForServer
       })
     });
 
