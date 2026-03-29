@@ -10,6 +10,7 @@ const BackgroundAudio = {
   isPlaying: false,
   playbackStartTime: 0,
   pausedTime: 0,
+  wakeLock: null,
   
   init(audioElement) {
     this.audioElement = audioElement;
@@ -18,6 +19,7 @@ const BackgroundAudio = {
     this.setupVisibilityHandlers();
     this.setupMediaSession();
     this.preventPauseOnBlur();
+    this.setupWakeLock();
     console.log('Persistent background audio initialized');
   },
 
@@ -96,6 +98,46 @@ const BackgroundAudio = {
         this.audioElement.play().catch(e => console.error('Play on visibility visible failed:', e));
       }
     });
+  },
+
+  // Setup Wake Lock to prevent screen from turning off during playback
+  setupWakeLock() {
+    if ('wakeLock' in navigator) {
+      this.audioElement.addEventListener('play', async () => {
+        try {
+          this.wakeLock = await navigator.wakeLock.request('screen');
+          console.log('Wake lock acquired');
+        } catch (e) {
+          console.warn('Wake lock not available:', e);
+        }
+      });
+
+      this.audioElement.addEventListener('pause', async () => {
+        if (this.wakeLock) {
+          try {
+            await this.wakeLock.release();
+            this.wakeLock = null;
+            console.log('Wake lock released');
+          } catch (e) {
+            console.error('Wake lock release failed:', e);
+          }
+        }
+      });
+
+      // Re-acquire wake lock if document becomes visible again
+      document.addEventListener('visibilitychange', async () => {
+        if (!document.hidden && this.isPlaying && !this.wakeLock) {
+          try {
+            this.wakeLock = await navigator.wakeLock.request('screen');
+            console.log('Wake lock re-acquired');
+          } catch (e) {
+            console.warn('Wake lock re-acquire failed:', e);
+          }
+        }
+      });
+    } else {
+      console.log('Wake Lock API not supported');
+    }
   },
 
   // Ensure playback continues even if browser pauses
