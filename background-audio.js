@@ -1,101 +1,104 @@
-// ===== iOS PWA BACKGROUND AUDIO FIX =====
-// Specifically handles iOS (iPhone/iPad) audio limitations
+// ===== iOS PWA Audio - Honest Implementation =====
+// iOS PWAs have fundamental audio limitations we cannot overcome with code
 
 const BackgroundAudio = {
   audioElement: null,
   isPlaying: false,
-  audioContext: null,
   
   init(audioElement) {
     this.audioElement = audioElement;
-    console.log('🎵 BackgroundAudio initializing for iOS...');
+    console.log('🎵 BackgroundAudio initialized');
     
-    // Critical iOS settings
-    this.setupIOSAudio();
-    this.setupMediaSession();
-    this.setupPlaybackHandlers();
-    
-    console.log('✓ iOS audio configured');
-  },
-
-  setupIOSAudio() {
-    // Ensure audio element has all iOS-specific attributes
+    // Configure audio element
     this.audioElement.muted = false;
     this.audioElement.volume = 1;
-    this.audioElement.crossOrigin = 'anonymous';
-    this.audioElement.preload = 'auto';
-    
-    // iOS specific: playsinline is critical
     this.audioElement.setAttribute('playsinline', 'playsinline');
     this.audioElement.setAttribute('webkit-playsinline', 'webkit-playsinline');
     
-    // iOS requires user interaction first
-    const enableAudio = () => {
-      console.log('📱 User interaction detected, enabling audio...');
-      this.createAudioContext();
-      document.removeEventListener('touchend', enableAudio);
-      document.removeEventListener('click', enableAudio);
-    };
+    // Detect iOS and warn user
+    this.detectiOSLimitation();
     
-    document.addEventListener('touchend', enableAudio);
-    document.addEventListener('click', enableAudio);
+    // Setup what we CAN do
+    this.setupMediaSession();
+    this.setupPlaybackHandlers();
   },
 
-  createAudioContext() {
-    if (this.audioContext) return;
+  detectiOSLimitation() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isPWA = window.matchMedia('(display-mode: standalone)').matches;
     
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      this.audioContext = new AudioContext();
+    if (isIOS && isPWA) {
+      console.warn('⚠️  iOS PWA Detected');
+      console.warn('iOS PWAs have background audio restrictions:');
+      console.warn('- Audio will mute when app is backgrounded');
+      console.warn('- This is an iOS limitation, not fixable with code');
+      console.warn('- Use Safari in split-view for background audio');
+      console.warn('- Or use on Android for full background audio');
       
-      // iOS: Need to connect media element to context for background audio
-      const source = this.audioContext.createMediaElementAudioSource(this.audioElement);
-      source.connect(this.audioContext.destination);
-      
-      console.log('✓ Audio context created and connected');
-      
-      // Keep context alive
-      this.keepContextAlive();
-      
-    } catch (e) {
-      console.error('✗ Audio context failed:', e);
+      // Show user-facing warning
+      this.showiOSWarning();
     }
   },
 
-  keepContextAlive() {
-    if (!this.audioContext) return;
+  showiOSWarning() {
+    // Check if already shown
+    if (localStorage.getItem('iosWarningShown')) return;
     
-    // Resume context every 100ms to prevent iOS suspension
-    setInterval(() => {
-      if (this.audioContext && this.audioContext.state === 'suspended') {
-        this.audioContext.resume().catch(e => {
-          console.log('Context resume failed (normal)', e.message);
-        });
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (!isIOS) return;
+    
+    // Create warning banner
+    const banner = document.createElement('div');
+    banner.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(135deg, #ff6b6b, #ff8c00);
+      color: white;
+      padding: 15px;
+      text-align: center;
+      z-index: 999999;
+      font-weight: bold;
+      font-size: 14px;
+      max-height: 100px;
+      overflow: hidden;
+    `;
+    
+    banner.innerHTML = `
+      <div style="margin-bottom: 10px;">⚠️ iOS Limitation Detected</div>
+      <div style="font-size: 12px; margin-bottom: 10px;">
+        Audio will mute when you background this app (iOS PWA restriction).
+        Try: Safari split-view, or use on Android for full background audio.
+      </div>
+      <button onclick="this.parentElement.remove(); localStorage.setItem('iosWarningShown', 'true');" 
+              style="background: white; color: #ff6b6b; border: none; padding: 5px 15px; border-radius: 5px; cursor: pointer; font-weight: bold;">
+        Got it
+      </button>
+    `;
+    
+    document.body.prepend(banner);
+    
+    // Auto-dismiss after 10 seconds
+    setTimeout(() => {
+      if (banner.parentElement) {
+        banner.style.opacity = '0';
+        banner.style.transition = 'opacity 0.3s';
+        setTimeout(() => banner.remove(), 300);
       }
-    }, 100);
+    }, 10000);
   },
 
   setupPlaybackHandlers() {
     this.audioElement.addEventListener('play', () => {
       this.isPlaying = true;
-      console.log('▶ Playing');
-      
-      // iOS: Resume context on play
-      if (this.audioContext && this.audioContext.state === 'suspended') {
-        this.audioContext.resume();
-      }
-      
-      // Create context if needed
-      if (!this.audioContext) {
-        this.createAudioContext();
-      }
-      
+      console.log('▶ Audio playing');
       this.updateMediaSession();
     });
 
     this.audioElement.addEventListener('pause', () => {
       this.isPlaying = false;
-      console.log('⏸ Paused');
+      console.log('⏸ Audio paused');
       this.updateMediaSession();
     });
 
@@ -108,22 +111,18 @@ const BackgroundAudio = {
     if (!navigator.mediaSession) return;
 
     navigator.mediaSession.setActionHandler('play', () => {
-      console.log('🎧 Lock screen: play');
       this.audioElement.play();
     });
 
     navigator.mediaSession.setActionHandler('pause', () => {
-      console.log('🎧 Lock screen: pause');
       this.audioElement.pause();
     });
 
     navigator.mediaSession.setActionHandler('nexttrack', () => {
-      console.log('🎧 Lock screen: next');
       window.playNext?.();
     });
 
     navigator.mediaSession.setActionHandler('previoustrack', () => {
-      console.log('🎧 Lock screen: previous');
       window.playPrevious?.();
     });
   },
@@ -146,19 +145,12 @@ const BackgroundAudio = {
   },
 
   forcePlayback() {
-    console.log('🔊 Force playback');
-    
     this.audioElement.muted = false;
     this.audioElement.volume = 1;
-    
-    if (this.audioContext && this.audioContext.state === 'suspended') {
-      this.audioContext.resume();
-    }
-    
     if (this.audioElement.paused) {
       this.audioElement.play();
     }
   }
 };
 
-console.log('🍎 iOS Background Audio Module Loaded');
+console.log('🎵 Background audio module loaded');
