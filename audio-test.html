@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Audio Background Playback - Debug Test</title>
+    <style>
+        body { font-family: monospace; background: #1a1a1a; color: #0f0; padding: 20px; }
+        .log { background: #0a0a0a; border: 1px solid #0f0; padding: 10px; margin: 10px 0; height: 300px; overflow-y: auto; }
+        .section { margin: 20px 0; padding: 10px; border: 1px solid #0f0; }
+        button { background: #0f0; color: #000; padding: 10px 20px; margin: 5px; cursor: pointer; }
+        input { background: #333; color: #0f0; padding: 5px; }
+        .status { font-weight: bold; margin: 10px 0; }
+        .pass { color: #0f0; }
+        .fail { color: #f00; }
+    </style>
+</head>
+<body>
+
+<h1>🎵 Background Audio Debug Test</h1>
+
+<div class="section">
+    <h2>Audio Source</h2>
+    <input type="file" id="audioFile" accept="audio/*">
+    <button onclick="testLoadAudio()">Load Audio File</button>
+    <button onclick="testPlayAudio()">▶ Play</button>
+    <button onclick="testPauseAudio()">⏸ Pause</button>
+</div>
+
+<div class="section">
+    <h2>Audio Element Status</h2>
+    <div id="audioStatus" class="status"></div>
+    <div>Volume: <input type="range" id="volControl" min="0" max="100" value="100" onchange="setVolume(this.value)"></div>
+</div>
+
+<div class="section">
+    <h2>Web Audio Tests</h2>
+    <button onclick="testWebAudioContext()">Test Web Audio Context</button>
+    <button onclick="testMediaElementSource()">Test MediaElementSource Connection</button>
+    <button onclick="testAnalyser()">Test Analyser</button>
+</div>
+
+<div class="section">
+    <h2>Background Audio Tests</h2>
+    <button onclick="testBackgroundPlayback()">Simulate Tab Loss (click then switch tabs)</button>
+    <button onclick="resumeAudioContext()">Resume Audio Context</button>
+    <button onclick="forcePlayback()">Force Playback</button>
+</div>
+
+<div class="section">
+    <h2>Logs</h2>
+    <div id="logs" class="log"></div>
+    <button onclick="clearLogs()">Clear Logs</button>
+</div>
+
+<audio id="testAudio" style="width: 100%; margin-top: 20px;" controls crossorigin="anonymous" preload="auto"></audio>
+
+<script>
+let testAudio = document.getElementById('testAudio');
+let logsDiv = document.getElementById('logs');
+let audioContext = null;
+let analyser = null;
+let source = null;
+
+function log(msg, type = 'info') {
+    const timestamp = new Date().toLocaleTimeString();
+    const color = type === 'error' ? '#f00' : type === 'success' ? '#0f0' : '#0ff';
+    const entry = document.createElement('div');
+    entry.style.color = color;
+    entry.textContent = `[${timestamp}] ${msg}`;
+    logsDiv.appendChild(entry);
+    logsDiv.scrollTop = logsDiv.scrollHeight;
+    console.log(msg);
+}
+
+function clearLogs() {
+    logsDiv.innerHTML = '';
+}
+
+function setVolume(val) {
+    testAudio.volume = val / 100;
+    testAudio.muted = false;
+    log(`Volume set to ${val}%`, 'success');
+    updateStatus();
+}
+
+function updateStatus() {
+    const status = document.getElementById('audioStatus');
+    status.innerHTML = `
+        <div>Playing: ${testAudio.paused ? '❌' : '▶️'}</div>
+        <div>Muted: ${testAudio.muted ? '🔇' : '🔊'}</div>
+        <div>Volume: ${(testAudio.volume * 100).toFixed(0)}%</div>
+        <div>Duration: ${testAudio.duration ? testAudio.duration.toFixed(2)+'s' : 'Unknown'}</div>
+        <div>Current Time: ${testAudio.currentTime.toFixed(2)}s</div>
+        <div>Source: ${testAudio.src ? (testAudio.src.substring(0, 50) + '...') : 'None'}</div>
+        <div>Web Audio Context: ${audioContext ? (audioContext.state) : 'Not created'}</div>
+        <div>MediaElementSource: ${source ? '✓' : '✗'}</div>
+    `;
+}
+
+function testLoadAudio() {
+    const file = document.getElementById('audioFile').files[0];
+    if (!file) {
+        log('No file selected', 'error');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const blob = new Blob([e.target.result], {type: file.type});
+        testAudio.src = URL.createObjectURL(blob);
+        log(`✓ Audio loaded: ${file.name} (${(file.size/1024/1024).toFixed(2)}MB)`, 'success');
+        updateStatus();
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function testPlayAudio() {
+    if (!testAudio.src) {
+        log('No audio source set', 'error');
+        return;
+    }
+
+    log('Attempting to play audio...', 'info');
+    testAudio.muted = false;
+    testAudio.volume = 1;
+    
+    testAudio.play().then(() => {
+        log('✓ Play successful', 'success');
+        updateStatus();
+    }).catch(err => {
+        log(`✗ Play failed: ${err.message}`, 'error');
+        updateStatus();
+    });
+}
+
+function testPauseAudio() {
+    testAudio.pause();
+    log('⏸ Audio paused', 'info');
+    updateStatus();
+}
+
+function testWebAudioContext() {
+    log('Testing Web Audio Context...', 'info');
+    
+    if (!window.AudioContext && !window.webkitAudioContext) {
+        log('✗ Web Audio API not supported', 'error');
+        return;
+    }
+
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioContext = new AudioContext();
+        log(`✓ Web Audio Context created: ${audioContext.state}`, 'success');
+        log(`  Sample Rate: ${audioContext.sampleRate}Hz`, 'success');
+        log(`  Channels: ${audioContext.destination.maxChannelCount}`, 'success');
+        updateStatus();
+    } catch (e) {
+        log(`✗ Web Audio Error: ${e.message}`, 'error');
+    }
+}
+
+function testMediaElementSource() {
+    log('Testing MediaElementSource connection...', 'info');
+
+    if (!audioContext) {
+        log('✗ Web Audio Context not created', 'error');
+        return;
+    }
+
+    try {
+        if (source) {
+            log('✗ MediaElementSource already connected', 'error');
+            return;
+        }
+
+        source = audioContext.createMediaElementSource(testAudio);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+
+        log('✓ MediaElementSource connected', 'success');
+        log('  source → analyser → destination', 'success');
+        updateStatus();
+    } catch (e) {
+        log(`✗ Connection Error: ${e.message}`, 'error');
+    }
+}
+
+function testAnalyser() {
+    log('Testing Analyser...', 'info');
+
+    if (!analyser) {
+        log('✗ Analyser not created', 'error');
+        return;
+    }
+
+    try {
+        const data = new Uint8Array(analyser.frequencyBinCount);
+        analyser.getByteFrequencyData(data);
+        const max = Math.max(...data);
+        log(`✓ Analyser working: max frequency = ${max}`, 'success');
+    } catch (e) {
+        log(`✗ Analyser Error: ${e.message}`, 'error');
+    }
+}
+
+function testBackgroundPlayback() {
+    log('=== BACKGROUND PLAYBACK TEST ===', 'info');
+    log('1. Now playing audio', 'info');
+    testPlayAudio();
+    
+    log('2. SWITCH TO ANOTHER TAB NOW (in 2 seconds)', 'info');
+    log('3. You should still hear audio playing!', 'info');
+    log('4. Audio context state:', audioContext ? audioContext.state : 'No context');
+    
+    // Monitor context state
+    if (audioContext) {
+        const checkInterval = setInterval(() => {
+            if (audioContext.state === 'suspended') {
+                log('⚠️  Audio context suspended! Resuming...', 'error');
+                audioContext.resume();
+            }
+        }, 500);
+        
+        setTimeout(() => clearInterval(checkInterval), 60000); // Stop checking after 1 min
+    }
+}
+
+function resumeAudioContext() {
+    if (!audioContext) {
+        log('✗ No audio context', 'error');
+        return;
+    }
+
+    log(`Current context state: ${audioContext.state}`, 'info');
+    
+    if (audioContext.state === 'suspended') {
+        audioContext.resume().then(() => {
+            log('✓ Audio context resumed', 'success');
+            updateStatus();
+        }).catch(err => {
+            log(`✗ Resume failed: ${err}`, 'error');
+        });
+    } else {
+        log('Audio context already running', 'info');
+    }
+}
+
+function forcePlayback() {
+    log('Force playing audio...', 'info');
+    
+    if (!audioContext) testWebAudioContext();
+    if (!source) testMediaElementSource();
+    
+    if (audioContext && audioContext.state === 'suspended') {
+        audioContext.resume().then(() => {
+            log('✓ Context resumed', 'success');
+            testPlayAudio();
+        });
+    } else {
+        testPlayAudio();
+    }
+}
+
+// Setup audio event listeners
+testAudio.addEventListener('play', () => {
+    log('📢 Audio play event', 'success');
+    updateStatus();
+});
+
+testAudio.addEventListener('pause', () => {
+    log('📢 Audio pause event', 'info');
+    updateStatus();
+});
+
+testAudio.addEventListener('playing', () => {
+    log('📢 Audio playing event', 'success');
+});
+
+testAudio.addEventListener('ended', () => {
+    log('📢 Audio ended event', 'info');
+    updateStatus();
+});
+
+testAudio.addEventListener('error', (e) => {
+    log(`✗ Audio error: ${testAudio.error?.message}`, 'error');
+    updateStatus();
+});
+
+testAudio.addEventListener('loadstart', () => {
+    log('📢 Load start', 'info');
+});
+
+testAudio.addEventListener('canplay', () => {
+    log('✓ Can play', 'success');
+});
+
+testAudio.addEventListener('loadedmetadata', () => {
+    log(`✓ Metadata loaded: ${testAudio.duration.toFixed(2)}s`, 'success');
+    updateStatus();
+});
+
+// Initialize
+log('🎵 Audio Debug Test Ready', 'success');
+log('1. Select an audio file', 'info');
+log('2. Click "Load Audio File"', 'info');
+log('3. Click "Play"', 'info');
+log('4. Test Web Audio components', 'info');
+log('5. Try "Simulate Tab Loss" and switch tabs', 'info');
+updateStatus();
+
+</script>
+
+</body>
+</html>

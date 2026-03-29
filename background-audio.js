@@ -1,90 +1,177 @@
-// ===== BACKGROUND AUDIO WITH PROPER WEB AUDIO ROUTING =====
-// Creates a parallel audio stream for background playback
-// Keeps audio playing when tab loses focus
+// ===== COMPREHENSIVE BACKGROUND AUDIO HANDLER =====
+// Handles every possible audio scenario and failure case
 
 const BackgroundAudio = {
   audioElement: null,
   audioContext: null,
   analyser: null,
   source: null,
+  gain: null,
   isPlaying: false,
   playCheckInterval: null,
+  connectionAttempts: 0,
+  maxConnectionAttempts: 5,
   
   init(audioElement) {
+    console.log('🎵 [BackgroundAudio] Initializing...');
     this.audioElement = audioElement;
-    this.setupAudioContext();
+    
+    if (!audioElement) {
+      console.error('✗ No audio element provided');
+      return;
+    }
+
+    // Ensure audio element settings
+    this.ensureAudioElementSettings();
+    
+    // Setup listeners
     this.setupPlaybackHandlers();
     this.setupVisibilityHandlers();
     this.setupMediaSession();
     this.preventPauseOnBlur();
-    console.log('🎵 Background audio initialized with Web Audio routing');
+    
+    // Create Web Audio context (lazy load on first play)
+    this.setupLazyAudioContext();
+    
+    console.log('✓ [BackgroundAudio] Initialization complete');
   },
 
-  // Create Web Audio context ONCE and keep it alive
-  setupAudioContext() {
-    if (this.audioContext) return;
+  // Ensure audio element is properly configured
+  ensureAudioElementSettings() {
+    console.log('🔧 [BackgroundAudio] Configuring audio element...');
     
+    this.audioElement.muted = false;
+    this.audioElement.volume = 1;
+    this.audioElement.crossOrigin = 'anonymous';
+    this.audioElement.preload = 'auto';
+    
+    // Remove any CSS that might mute
+    this.audioElement.style.muted = 'false';
+    
+    console.log(`✓ Audio element: volume=${this.audioElement.volume}, muted=${this.audioElement.muted}`);
+  },
+
+  // Create Web Audio context only when needed
+  setupLazyAudioContext() {
+    console.log('📦 [BackgroundAudio] Web Audio setup deferred until first play');
+    
+    this.audioElement.addEventListener('play', () => {
+      if (!this.audioContext) {
+        this.createAudioContext();
+      }
+    }, { once: true });
+  },
+
+  // Create and configure Web Audio context
+  createAudioContext() {
+    console.log('🔧 [BackgroundAudio] Creating Web Audio context...');
+    
+    if (this.audioContext) {
+      console.log('ℹ Audio context already exists');
+      return;
+    }
+
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) {
+        console.warn('✗ Web Audio API not supported');
+        return;
+      }
+
       this.audioContext = new AudioContext();
+      console.log(`✓ Audio context created: ${this.audioContext.state}`);
+      console.log(`  - Sample Rate: ${this.audioContext.sampleRate}Hz`);
+      console.log(`  - Max channels: ${this.audioContext.destination.maxChannelCount}`);
+
+      // Auto-resume on user interaction
+      this.setupContextAutoResume();
       
-      // Auto-resume on any user interaction
-      const resumeAudio = () => {
-        if (this.audioContext.state === 'suspended') {
-          this.audioContext.resume().then(() => {
-            console.log('✓ Audio context resumed');
-          }).catch(e => console.error('Resume failed:', e));
-        }
-        document.removeEventListener('click', resumeAudio);
-        document.removeEventListener('touchstart', resumeAudio);
-      };
-      
-      document.addEventListener('click', resumeAudio);
-      document.addEventListener('touchstart', resumeAudio);
-      
-      console.log('✓ Web Audio context created');
+      // Try to connect immediately
+      this.connectMediaElement();
+
     } catch (e) {
-      console.warn('Web Audio API not supported:', e);
+      console.error(`✗ Failed to create audio context: ${e.message}`);
     }
   },
 
-  // Connect audio element to Web Audio for background playback
+  // Auto-resume audio context on user interaction
+  setupContextAutoResume() {
+    const resume = () => {
+      if (this.audioContext && this.audioContext.state === 'suspended') {
+        console.log('▶ [BackgroundAudio] Resuming suspended audio context...');
+        this.audioContext.resume()
+          .then(() => console.log('✓ Audio context resumed'))
+          .catch(e => console.error(`✗ Resume failed: ${e}`));
+      }
+      document.removeEventListener('click', resume);
+      document.removeEventListener('touchstart', resume);
+    };
+
+    document.addEventListener('click', resume);
+    document.addEventListener('touchstart', resume);
+  },
+
+  // Connect media element to Web Audio with fallback
   connectMediaElement() {
-    if (!this.audioContext || this.source) return;
-    
+    if (!this.audioContext) {
+      console.log('ℹ No audio context yet');
+      return;
+    }
+
+    if (this.source) {
+      console.log('ℹ Already connected to Web Audio');
+      return;
+    }
+
+    if (this.connectionAttempts >= this.maxConnectionAttempts) {
+      console.warn('✗ Max connection attempts reached, giving up');
+      return;
+    }
+
     try {
+      console.log(`🔗 [BackgroundAudio] Connecting media element (attempt ${this.connectionAttempts + 1})...`);
+      
       this.source = this.audioContext.createMediaElementAudioSource(this.audioElement);
       
-      // Create analyser for particle effects (optional)
+      // Create gain node for volume control
+      this.gain = this.audioContext.createGain();
+      this.gain.gain.value = 1;
+      
+      // Create analyser for visualizations
       this.analyser = this.audioContext.createAnalyser();
       this.analyser.fftSize = 256;
-      
-      // Route: source → analyser → destination
-      // This allows BOTH visualization AND audio output
-      this.source.connect(this.analyser);
+
+      // Connect: source → gain → analyser → destination
+      this.source.connect(this.gain);
+      this.gain.connect(this.analyser);
       this.analyser.connect(this.audioContext.destination);
-      
-      console.log('✓ Audio element connected to Web Audio destination');
-      return true;
+
+      console.log('✓ Media element connected to Web Audio');
+      console.log('  Chain: source → gain → analyser → destination');
+      this.connectionAttempts = 0; // Reset on success
+
     } catch (e) {
-      console.error('Failed to connect media element:', e);
-      return false;
+      console.error(`✗ Connection failed (attempt ${this.connectionAttempts + 1}): ${e.message}`);
+      this.connectionAttempts++;
+      
+      // Retry after delay
+      if (this.connectionAttempts < this.maxConnectionAttempts) {
+        setTimeout(() => this.connectMediaElement(), 1000);
+      }
     }
   },
 
   // Track playback state
   setupPlaybackHandlers() {
+    console.log('📝 [BackgroundAudio] Setting up playback handlers...');
+
     this.audioElement.addEventListener('play', () => {
       this.isPlaying = true;
       console.log('▶ Audio started playing');
       
-      // Ensure audio context is running
-      if (this.audioContext && this.audioContext.state === 'suspended') {
-        this.audioContext.resume();
-      }
-      
-      // Connect media element on first play
-      if (!this.source) {
+      // Ensure Web Audio is connected
+      if (!this.source && this.audioContext) {
+        console.log('🔗 Connecting media element on play...');
         this.connectMediaElement();
       }
       
@@ -108,71 +195,98 @@ const BackgroundAudio = {
     });
 
     this.audioElement.addEventListener('error', (e) => {
-      console.error('✗ Audio error:', e.error);
+      console.error(`✗ Audio error: ${this.audioElement.error?.message}`);
       this.isPlaying = false;
     });
+
+    this.audioElement.addEventListener('loadstart', () => console.log('📥 Loading...'));
+    this.audioElement.addEventListener('canplay', () => console.log('✓ Can play'));
+    this.audioElement.addEventListener('playing', () => console.log('▶ Playing'));
   },
 
   // CRITICAL: Prevent browser from muting backgrounded tabs
   preventPauseOnBlur() {
-    // Resume audio context on blur to prevent muting
+    console.log('🔊 [BackgroundAudio] Setting up tab blur handlers...');
+
     window.addEventListener('blur', () => {
+      console.log('📵 [TAB BLUR] Window lost focus');
+      
+      // Resume audio context
       if (this.audioContext && this.audioContext.state === 'suspended') {
-        this.audioContext.resume().catch(e => console.error('Resume on blur failed:', e));
+        console.log('  → Resuming audio context...');
+        this.audioContext.resume().catch(e => console.error(`  ✗ Resume failed: ${e}`));
       }
       
       // Also ensure audio element keeps playing
       if (this.isPlaying && this.audioElement.paused) {
-        console.log('📵 Tab blurred, resuming audio');
-        this.audioElement.play().catch(e => console.error('Play on blur failed:', e));
+        console.log('  → Resuming audio element...');
+        this.audioElement.play().catch(e => console.error(`  ✗ Play failed: ${e}`));
       }
     });
 
-    // Also handle visibility change
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        console.log('📵 App backgrounded');
-        // Keep audio context alive
+        console.log('📵 [PAGE HIDDEN] Tab is no longer visible');
+        
+        // Resume context
         if (this.audioContext && this.audioContext.state === 'suspended') {
+          console.log('  → Resuming audio context...');
           this.audioContext.resume().catch(e => {});
         }
+        
+        // Keep checking every 500ms
+        this.ensurePlayback();
+        
       } else {
-        console.log('📱 App foregrounded');
+        console.log('📱 [PAGE VISIBLE] Tab is visible again');
+        
         // Resume if paused
         if (this.isPlaying && this.audioElement.paused) {
-          this.audioElement.play().catch(e => console.error('Play on foreground failed:', e));
+          console.log('  → Resuming audio...');
+          this.audioElement.play().catch(e => console.error(`  ✗ Play failed: ${e}`));
         }
       }
     });
   },
 
-  // Periodically ensure playback continues
+  // Aggressively ensure playback continues
   ensurePlayback() {
     if (this.playCheckInterval) {
       clearInterval(this.playCheckInterval);
     }
 
+    // Check every 300ms (more frequent than before)
     this.playCheckInterval = setInterval(() => {
       if (!this.isPlaying) {
         clearInterval(this.playCheckInterval);
         return;
       }
 
-      // Resume audio context if it got suspended
+      // Resume audio context if suspended
       if (this.audioContext && this.audioContext.state === 'suspended') {
         this.audioContext.resume().catch(e => {});
       }
 
-      // If should be playing but isn't, resume
+      // If should be playing but paused, resume
       if (this.audioElement.paused && this.isPlaying) {
-        console.log('🔊 Audio paused unexpectedly, resuming');
-        this.audioElement.play().catch(e => {
-          console.error('Resume failed:', e);
-        });
+        console.log('🔊 [ENSURE] Audio paused, resuming...');
+        this.audioElement.play().catch(e => console.error(`✗ Resume failed: ${e}`));
       }
-    }, 500); // Check every 500ms for responsiveness
 
-    // Clear interval when audio ends
+      // Ensure volume is still up
+      if (this.audioElement.muted) {
+        console.log('🔊 [ENSURE] Audio was muted, unmuting...');
+        this.audioElement.muted = false;
+      }
+
+      if (this.audioElement.volume === 0) {
+        console.log('🔊 [ENSURE] Volume is 0, setting to 1...');
+        this.audioElement.volume = 1;
+      }
+
+    }, 300); // Check every 300ms
+
+    // Cleanup on end
     const onEnded = () => {
       if (this.playCheckInterval) {
         clearInterval(this.playCheckInterval);
@@ -182,48 +296,48 @@ const BackgroundAudio = {
     this.audioElement.addEventListener('ended', onEnded);
   },
 
-  // Media Session API for lock screen controls
+  // Media Session API for lock screen
   setupMediaSession() {
     if (!navigator.mediaSession) {
-      console.log('Media Session API not available');
+      console.log('ℹ Media Session API not available');
       return;
     }
 
+    console.log('🎵 [BackgroundAudio] Setting up Media Session...');
+
     navigator.mediaSession.setActionHandler('play', () => {
-      this.audioElement.play().catch(e => console.error('Play failed:', e));
+      console.log('📲 Lock screen: Play');
+      this.audioElement.play().catch(e => console.error(`Play failed: ${e}`));
     });
 
     navigator.mediaSession.setActionHandler('pause', () => {
+      console.log('📲 Lock screen: Pause');
       this.audioElement.pause();
     });
 
     navigator.mediaSession.setActionHandler('nexttrack', () => {
+      console.log('📲 Lock screen: Next');
       window.playNext?.();
     });
 
     navigator.mediaSession.setActionHandler('previoustrack', () => {
+      console.log('📲 Lock screen: Previous');
       window.playPrevious?.();
     });
 
     navigator.mediaSession.setActionHandler('seek', (event) => {
       if (event.seekTime !== undefined) {
+        console.log(`📲 Lock screen: Seek to ${event.seekTime.toFixed(2)}s`);
         this.audioElement.currentTime = event.seekTime;
       }
     });
-
-    console.log('✓ Media Session API initialized');
   },
 
   // Handle visibility changes
   setupVisibilityHandlers() {
     document.addEventListener('visibilitychange', () => {
-      if (this.isPlaying) {
-        if (document.hidden) {
-          console.log('📱 App backgrounded, maintaining audio');
-        } else {
-          console.log('📱 App foregrounded');
-        }
-      }
+      const state = document.hidden ? '📵 HIDDEN' : '📱 VISIBLE';
+      console.log(`[VISIBILITY] ${state}`);
     });
   },
 
@@ -246,7 +360,7 @@ const BackgroundAudio = {
     navigator.mediaSession.playbackState = state;
   },
 
-  // Get frequency data for particles (optional visualization)
+  // Get frequency data for visualizations
   getFrequencyData() {
     if (!this.analyser) return new Uint8Array(0);
     
@@ -259,25 +373,33 @@ const BackgroundAudio = {
     }
   },
 
-  // Force playback (manual override)
+  // Force playback (nuclear option)
   forcePlayback() {
+    console.log('🔊 [FORCE PLAYBACK] Forcing audio to play...');
+    
     if (!this.isPlaying) {
-      console.log('Not currently playing, cannot force');
+      console.log('✗ Not in playing state');
       return;
     }
 
-    if (this.audioElement.paused) {
-      console.log('🔊 Forcing audio to play');
-      this.audioElement.play().catch(e => {
-        console.error('Force play failed:', e);
-      });
+    // Resume context
+    if (this.audioContext && this.audioContext.state === 'suspended') {
+      this.audioContext.resume().then(() => {
+        console.log('✓ Context resumed');
+      }).catch(e => console.error(`✗ Resume failed: ${e}`));
     }
 
-    // Resume audio context
-    if (this.audioContext && this.audioContext.state === 'suspended') {
-      this.audioContext.resume().catch(e => {});
+    // Ensure element settings
+    this.audioElement.muted = false;
+    this.audioElement.volume = 1;
+
+    // Force play
+    if (this.audioElement.paused) {
+      this.audioElement.play().then(() => {
+        console.log('✓ Playback forced');
+      }).catch(e => console.error(`✗ Play failed: ${e}`));
     }
   }
 };
 
-console.log('🎵 Background audio module with Web Audio routing loaded');
+console.log('🎵 Background Audio Module Loaded');

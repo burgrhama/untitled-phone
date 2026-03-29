@@ -1004,7 +1004,7 @@
 <!-- player bar -->
 <div class="player">
 <div id="nowPlaying">⚬ no track playing</div>
-<audio id="audioPlayer" controls style="width:100%; margin-top:8px;" crossorigin="anonymous" preload="auto"></audio>
+<audio id="audioPlayer" controls style="width:100%; margin-top:8px;" crossorigin="anonymous" preload="auto" playsinline webkit-playsinline></audio>
 <script>
 // Initialize background audio with retry logic
 function initBackgroundAudio() {
@@ -1775,6 +1775,7 @@ async function addSongs() {
 }
 
 async function playTrack(index) {
+  console.log('[playTrack] Called with index:', index);
   const track = currentAlbumTracks[index];
   const player = document.getElementById("audioPlayer");
   const nowPlaying = document.getElementById("nowPlaying");
@@ -1906,6 +1907,7 @@ resizeCanvas();
 initParticles(targetParticleCount);
 
 function connectAudioAnalyser() {
+  console.log('[connectAudioAnalyser] Called, audioContext:', audioContext ? 'exists' : 'not created');
   if (audioContext) return;
   try {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -1940,6 +1942,10 @@ audioPlayer.addEventListener('play', () => {
 
 function animate() {
   if (!width || !height) return;
+  
+  if (audioContext && audioContext.state === 'suspended') {
+    audioContext.resume().catch(e => {});
+  }
   
   // Skip frequency analysis if analyser not available
   if (!analyser) {
