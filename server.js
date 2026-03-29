@@ -6,6 +6,8 @@ const cors = require('cors');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const AWS = require('aws-sdk');
+require('dotenv').config();
 
 const uploadDir = path.join(__dirname, 'uploads');
 if (!fs.existsSync(uploadDir)) {
@@ -27,6 +29,22 @@ const upload = multer({ storage });
 const app = express();
 const PORT = process.env.PORT || 3000;
 const SECRET_KEY = process.env.SECRET_KEY || 'your-secret-key-change-this-in-production';
+const USE_S3 = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY;
+const USE_BASE64 = !USE_S3;
+
+// S3 Configuration (optional)
+let s3 = null;
+if (USE_S3) {
+  AWS.config.update({
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+    region: process.env.AWS_REGION || 'us-east-1'
+  });
+  s3 = new AWS.S3();
+  console.log('S3 initialized');
+} else {
+  console.log('Storage mode: BASE64 in database');
+}
 
 // Middleware - CORS first
 app.use(cors({
@@ -220,15 +238,69 @@ app.post('/api/albums', verifyToken, (req, res) => {
   });
 });
 
-// ===== UPLOAD TRACK FILE =====
-app.post('/api/upload-track', verifyToken, upload.single('track'), (req, res) => {
+// ===== UPLOAD TRACK (HYBRID: BASE64 or S3) =====
+app.post('/api/upload-track', verifyToken, upload.single('track'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No file uploaded' });
   }
 
-  const origin = `${req.protocol}://${req.get('host')}`;
-  const url = `${origin}/uploads/${encodeURIComponent(req.file.filename)}`;
-  res.json({ name: req.file.originalname, url });
+  try {
+    if (USE_S3) {
+      // S3 Upload
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const s3Key = `audio/${Date.now()}-${req.file.filename}`;
+      
+      const params = {
+        Bucket: process.env.AWS_S3_BUCKET,
+        Key: s3Key,
+        Body: fileBuffer,
+        ContentType: req.file.mimetype || 'audio/mpeg',
+        ACL: 'public-read'
+      };
+
+      s3.upload(params, (err, data) => {
+        fs.unlinkSync(req.file.path);
+
+        if (err) {
+          console.error('S3 upload error:', err);
+          return res.status(500).json({ error: 'S3 upload failed' });
+        }
+
+        res.json({
+          name: req.file.originalname,
+          url: data.Location,
+          storage: 'S3'
+        });
+      });
+    } else {
+      // Base64 Storage (default for Render free tier)
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const base64 = fileBuffer.toString('base64');
+      const mimeType = req.file.mimetype || 'audio/mpeg';
+      const dataUri = `data:${mimeType};base64,${base64}`;
+      const fileSize = fileBuffer.length / 1024 / 1024;
+
+      if (fileSize > 25) {
+        fs.unlinkSync(req.file.path);
+        return res.status(413).json({ error: `File too large (${fileSize.toFixed(2)}MB, max 25MB)` });
+      }
+
+      fs.unlinkSync(req.file.path);
+
+      res.json({
+        name: req.file.originalname,
+        url: dataUri,
+        storage: 'BASE64',
+        size: `${fileSize.toFixed(2)}MB`
+      });
+    }
+  } catch (error) {
+    console.error('Upload error:', error);
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    res.status(500).json({ error: 'Upload failed' });
+  }
 });
 
 // ===== UPDATE ALBUM =====
@@ -274,9 +346,24 @@ app.delete('/api/albums/:id', verifyToken, (req, res) => {
   );
 });
 
-// ===== STATIC FILES & FRONTEND (LAST) =====
+// ===== DEBUG ENDPOINT =====
+app.get('/api/debug/uploads', (req, res) => {
+  fs.readdir(uploadDir, (err, files) => {
+    if (err) {
+      return res.json({ error: err.message, uploadDir });
+    }
+    res.json({ 
+      uploadDir, 
+      files: files || [], 
+      count: files?.length || 0,
+      storageMode: USE_S3 ? 'S3' : 'BASE64'
+    });
+  });
+});
 
-// Serve uploaded files with explicit CORS headers
+// ===== STATIC FILES & FRONTEND =====
+
+// Serve uploaded files with CORS headers (for file-based storage)
 app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
@@ -299,4 +386,5 @@ app.get('*', (req, res) => {
 // ===== START SERVER =====
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
+  console.log(`Storage mode: ${USE_S3 ? 'S3 (' + process.env.AWS_S3_BUCKET + ')' : 'BASE64 (database)'}`);
 });
