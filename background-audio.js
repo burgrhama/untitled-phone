@@ -1,29 +1,137 @@
-// ===== BACKGROUND AUDIO PLAYBACK HANDLER =====
-// This module ensures audio continues playing when:
-// 1. Phone screen locks
-// 2. User switches to another app
-// 3. App goes into background
-// 4. Lock screen is active
+// ===== PERSISTENT BACKGROUND AUDIO PLAYBACK =====
+// Keeps audio playing even when browser tab loses focus
+// Uses Web Audio API to maintain playback state independently
 
 const BackgroundAudio = {
   audioElement: null,
-  mediaSession: null,
+  audioContext: null,
+  analyser: null,
+  source: null,
+  isPlaying: false,
+  playbackStartTime: 0,
+  pausedTime: 0,
   
   init(audioElement) {
     this.audioElement = audioElement;
+    this.setupAudioContext();
+    this.setupPlaybackHandlers();
+    this.setupVisibilityHandlers();
     this.setupMediaSession();
-    this.preventAutoStop();
-    this.handleVisibilityChanges();
-    this.handleBeforeUnload();
-    console.log('Background audio handler initialized');
+    this.preventPauseOnBlur();
+    console.log('Persistent background audio initialized');
   },
 
-  // Media Session API: Control playback from lock screen
-  setupMediaSession() {
-    if (!navigator.mediaSession) {
-      console.warn('Media Session API not supported');
-      return;
+  // Initialize Web Audio API for independent playback control
+  setupAudioContext() {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      this.audioContext = new AudioContext();
+      this.analyser = this.audioContext.createAnalyser();
+      
+      // Resume context on first user interaction
+      if (this.audioContext.state === 'suspended') {
+        document.addEventListener('click', () => {
+          this.audioContext?.resume();
+        }, { once: true });
+      }
+    } catch (e) {
+      console.warn('Web Audio API not available:', e);
     }
+  },
+
+  // Connect audio element to Web Audio API
+  setupAudioSource() {
+    if (!this.audioContext || this.source) return;
+    
+    try {
+      this.source = this.audioContext.createMediaElementAudioSource(this.audioElement);
+      this.source.connect(this.analyser);
+      this.analyser.connect(this.audioContext.destination);
+      console.log('Audio source connected to Web Audio API');
+    } catch (e) {
+      console.log('Audio source already connected');
+    }
+  },
+
+  // Intercept play/pause to maintain state independently
+  setupPlaybackHandlers() {
+    this.audioElement.addEventListener('play', () => {
+      this.isPlaying = true;
+      this.playbackStartTime = Date.now() - (this.audioElement.currentTime * 1000);
+      this.ensurePlayback();
+    });
+
+    this.audioElement.addEventListener('pause', () => {
+      this.isPlaying = false;
+      this.pausedTime = this.audioElement.currentTime;
+    });
+
+    // Resume audio context when audio starts
+    this.audioElement.addEventListener('play', () => {
+      if (this.audioContext?.state === 'suspended') {
+        this.audioContext.resume().catch(e => console.error('Resume failed:', e));
+      }
+      this.setupAudioSource();
+    });
+  },
+
+  // Prevent browser from pausing when tab loses focus
+  preventPauseOnBlur() {
+    window.addEventListener('blur', () => {
+      if (this.isPlaying && this.audioElement.paused) {
+        console.log('Tab blurred, resuming audio');
+        this.audioElement.play().catch(e => console.error('Play on blur failed:', e));
+      }
+    });
+
+    // Also prevent pause when document becomes hidden
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && this.isPlaying && this.audioElement.paused) {
+        console.log('Document hidden, resuming audio');
+        setTimeout(() => {
+          this.audioElement.play().catch(e => console.error('Play on visibility hidden failed:', e));
+        }, 100);
+      } else if (!document.hidden && this.isPlaying && this.audioElement.paused) {
+        console.log('Document visible, ensuring audio plays');
+        this.audioElement.play().catch(e => console.error('Play on visibility visible failed:', e));
+      }
+    });
+  },
+
+  // Ensure playback continues even if browser pauses
+  ensurePlayback() {
+    if (!this.isPlaying) return;
+
+    // Check every 500ms if audio should be playing but isn't
+    const checkInterval = setInterval(() => {
+      if (!this.isPlaying) {
+        clearInterval(checkInterval);
+        return;
+      }
+
+      // If audio should be playing but browser paused it, resume
+      if (this.audioElement.paused && this.isPlaying && !document.hidden) {
+        console.log('Audio paused unexpectedly, resuming');
+        this.audioElement.play().catch(e => console.error('Resume failed:', e));
+      }
+
+      // Resume audio context if suspended
+      if (this.audioContext?.state === 'suspended') {
+        this.audioContext.resume().catch(e => {});
+      }
+    }, 500);
+
+    // Clear interval when audio ends
+    const onEnded = () => {
+      clearInterval(checkInterval);
+      this.audioElement.removeEventListener('ended', onEnded);
+    };
+    this.audioElement.addEventListener('ended', onEnded);
+  },
+
+  // Media Session API for lock screen controls
+  setupMediaSession() {
+    if (!navigator.mediaSession) return;
 
     navigator.mediaSession.setActionHandler('play', () => {
       this.audioElement.play().catch(e => console.error('Play failed:', e));
@@ -33,21 +141,44 @@ const BackgroundAudio = {
       this.audioElement.pause();
     });
 
-    navigator.mediaSession.setActionHandler('previoustrack', () => {
-      window.playPrevious?.();
-    });
-
     navigator.mediaSession.setActionHandler('nexttrack', () => {
       window.playNext?.();
     });
 
+    navigator.mediaSession.setActionHandler('previoustrack', () => {
+      window.playPrevious?.();
+    });
+
     navigator.mediaSession.setActionHandler('seek', (event) => {
-      if (event.seekTime) {
+      if (event.seekTime !== undefined) {
         this.audioElement.currentTime = event.seekTime;
       }
     });
+  },
 
-    this.updateMediaSession();
+  // Handle visibility changes
+  setupVisibilityHandlers() {
+    document.addEventListener('visibilitychange', () => {
+      if (this.isPlaying) {
+        if (document.hidden) {
+          console.log('App backgrounded, maintaining playback');
+        } else {
+          console.log('App foregrounded, resuming if paused');
+          if (this.audioElement.paused) {
+            this.audioElement.play().catch(e => console.error('Play failed:', e));
+          }
+        }
+      }
+    });
+
+    // Also monitor page visibility through lifecycle events
+    window.addEventListener('beforeunload', () => {
+      sessionStorage.setItem('audioPlayingState', JSON.stringify({
+        isPlaying: this.isPlaying,
+        currentTime: this.audioElement.currentTime,
+        trackIndex: window.currentTrackIndex
+      }));
+    });
   },
 
   // Update lock screen metadata
@@ -58,94 +189,48 @@ const BackgroundAudio = {
       title: trackName,
       artist: 'pirated untitled',
       album: 'Music',
-      artwork: artwork ? [
-        {
-          src: artwork,
-          sizes: '512x512',
-          type: 'image/jpeg',
-        }
-      ] : []
+      artwork: artwork ? [{
+        src: artwork,
+        sizes: '512x512',
+        type: 'image/jpeg'
+      }] : []
     });
 
-    // Update playback state
     const state = this.audioElement.paused ? 'paused' : 'playing';
     navigator.mediaSession.playbackState = state;
   },
 
-  // Prevent audio from stopping on visibility changes
-  handleVisibilityChanges() {
-    document.addEventListener('visibilitychange', () => {
-      const isVisible = document.visibilityState === 'visible';
-      
-      if (!isVisible) {
-        // App going to background - keep audio playing
-        console.log('App backgrounded, audio continues');
-        
-        // Resume audio context if suspended (iOS requirement)
-        if (window.audioContext && window.audioContext.state === 'suspended') {
-          window.audioContext.resume().catch(e => console.error('Resume failed:', e));
-        }
-      } else {
-        // App coming to foreground
-        console.log('App foregrounded');
-      }
-    });
-  },
-
-  // Prevent audio from stopping when user interacts with other elements
-  preventAutoStop() {
-    // Keep audio element playing on blur/focus
-    window.addEventListener('blur', () => {
-      console.log('Window blurred, audio should continue');
-    });
-
-    window.addEventListener('focus', () => {
-      console.log('Window focused');
-    });
-
-    // Prevent app from stopping audio on page hide
-    window.addEventListener('pagehide', () => {
-      console.log('Page hidden, audio should continue');
-    });
-
-    window.addEventListener('pageshow', () => {
-      console.log('Page shown');
-    });
-  },
-
-  // Handle before unload to save playback state
-  handleBeforeUnload() {
-    window.addEventListener('beforeunload', () => {
-      // Save current playback state
-      const state = {
-        currentTime: this.audioElement.currentTime,
-        paused: this.audioElement.paused,
-        trackIndex: window.currentTrackIndex,
-        volume: this.audioElement.volume
-      };
-      sessionStorage.setItem('audioState', JSON.stringify(state));
-    });
-  },
-
-  // Request persistent playback (Android)
-  requestPersistentPlayback() {
-    if (navigator.mediaDevices?.enumerateDevices) {
-      // This signals to browser that audio should be persistent
-      this.audioElement.play().catch(e => console.log('Play failed:', e));
-    }
-  },
-
-  // iOS specific: Keep audio playing across app suspension
+  // iOS specific: Keep context alive during suspension
   setupIOSAudioHandling() {
-    // Force audio to continue by checking state periodically
-    setInterval(() => {
-      if (document.hidden && !this.audioElement.paused) {
-        // If app is hidden and should be playing, ensure audio context is active
-        if (window.audioContext && window.audioContext.state === 'suspended') {
-          window.audioContext.resume().catch(e => console.error('Resume failed:', e));
-        }
+    // Resume audio context every 100ms if it's suspended
+    const resumeInterval = setInterval(() => {
+      if (this.isPlaying && this.audioContext?.state === 'suspended') {
+        this.audioContext.resume().catch(e => {});
       }
-    }, 1000);
+    }, 100);
+
+    // Stop checking when audio ends
+    this.audioElement.addEventListener('ended', () => {
+      clearInterval(resumeInterval);
+    });
+  },
+
+  // Force playback to continue (aggressive)
+  forcePlayback() {
+    if (!this.isPlaying) return;
+
+    if (this.audioElement.paused) {
+      this.audioElement.play().catch(e => {
+        console.error('Force play failed:', e);
+        // Try again with slight delay
+        setTimeout(() => this.audioElement.play().catch(() => {}), 100);
+      });
+    }
+
+    // Resume audio context
+    if (this.audioContext?.state === 'suspended') {
+      this.audioContext.resume().catch(e => {});
+    }
   }
 };
 

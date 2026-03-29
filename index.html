@@ -1004,8 +1004,21 @@
 <!-- player bar -->
 <div class="player">
 <div id="nowPlaying">⚬ no track playing</div>
-<audio id="audioPlayer" controls style="width:100%; margin-top:8px;"></audio>
-<script>if(window.BackgroundAudio) BackgroundAudio.init(document.getElementById("audioPlayer")); BackgroundAudio?.setupIOSAudioHandling();</script>
+<audio id="audioPlayer" controls style="width:100%; margin-top:8px;" crossorigin="anonymous" preload="auto"></audio>
+<script>
+// Initialize background audio with retry logic
+function initBackgroundAudio() {
+  if (window.BackgroundAudio && document.getElementById("audioPlayer")) {
+    BackgroundAudio.init(document.getElementById("audioPlayer"));
+    BackgroundAudio.setupIOSAudioHandling();
+    console.log('Background audio initialized');
+  } else {
+    setTimeout(initBackgroundAudio, 100);
+  }
+}
+document.addEventListener('DOMContentLoaded', initBackgroundAudio);
+if (document.readyState !== 'loading') initBackgroundAudio();
+</script>
 </div>
 
 <!-- CUSTOMIZATION PANEL -->
@@ -1960,6 +1973,7 @@ function togglePanel() {
 
 // Expose functions globally
 window.goHome = goHome;
+window.forcePlayback = () => BackgroundAudio?.forcePlayback();
 window.togglePanel = togglePanel;
 window.createAlbum = createAlbum;
 window.deleteAlbum = deleteAlbum;
