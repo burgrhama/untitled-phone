@@ -1,4 +1,5 @@
-const CACHE_NAME = 'pirated-untitled-v1';
+const CACHE_NAME = 'pirated-untitled-v2';
+const AUDIO_CACHE = 'pirated-untitled-audio-v1';
 const URLS_TO_CACHE = [
   '/',
   '/index.html',
@@ -23,7 +24,7 @@ self.addEventListener('activate', event => {
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
+          if (cacheName !== CACHE_NAME && cacheName !== AUDIO_CACHE) {
             return caches.delete(cacheName);
           }
         })
@@ -45,6 +46,30 @@ self.addEventListener('fetch', event => {
   // API calls - network only
   if (request.url.includes('/api/')) {
     event.respondWith(fetch(request));
+    return;
+  }
+
+  // Audio files - cache first, then network (for offline support + fast playback)
+  if (request.url.includes('/uploads/')) {
+    event.respondWith(
+      caches.match(request).then(response => {
+        if (response) {
+          return response;
+        }
+        return fetch(request).then(response => {
+          if (response.status === 200) {
+            const responseClone = response.clone();
+            caches.open(AUDIO_CACHE).then(cache => {
+              cache.put(request, responseClone);
+            });
+          }
+          return response;
+        }).catch(() => {
+          // If network fails, return a 503 error (will be handled by app)
+          return new Response('Audio not available offline', { status: 503 });
+        });
+      })
+    );
     return;
   }
 
