@@ -1049,7 +1049,8 @@ if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.
       msg.className = 'pwa-install-msg';
       msg.innerHTML = `
         <div style="position: fixed; bottom: 20px; left: 20px; right: 20px; background: rgba(0,0,0,0.9); color: white; padding: 15px; border-radius: 10px; font-size: 14px; z-index: 10000; border: 1px solid rgba(255,255,255,0.2);">
-          📱 Install this app for background music playback!
+          📱 <strong>Background audio:</strong> For best results, use browser tab (keep open) instead of PWA on some devices.<br>
+          PWA background playback depends on your phone's OS/browser.
           <button onclick="this.parentElement.remove()" style="float: right; background: none; border: none; color: white; font-size: 18px;">×</button>
         </div>
       `;
@@ -1781,9 +1782,16 @@ async function playTrack(index) {
     // Ensure volume is not muted and set to max
     player.volume = 1;
     player.muted = false;
-    console.log('Player volume:', player.volume, 'muted:', player.muted);
+    console.log('Player volume:', player.volume, 'muted:', player.muted, 'src:', player.src);
+
+    // Add debug event listeners
+    const debugEvents = ['loadstart', 'canplay', 'error', 'stalled', 'waiting', 'playing', 'pause'];
+    debugEvents.forEach(event => {
+      player.addEventListener(event, () => console.log(`Audio ${event}`));
+    });
 
     await player.play();
+    console.log('Playback started, duration:', player.duration, 'currentTime:', player.currentTime);
     nowPlaying.innerText = "● " + track.name;
     if(window.BackgroundAudio) BackgroundAudio.updateMediaSession(track.name);
   } catch (err) {

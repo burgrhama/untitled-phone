@@ -80,6 +80,7 @@ const BackgroundAudio = {
   // Prevent browser from pausing when tab loses focus
   preventPauseOnBlur() {
     window.addEventListener('blur', () => {
+      console.log('Window blurred, isPlaying:', this.isPlaying, 'audio paused:', this.audioElement.paused);
       if (this.isPlaying && this.audioElement.paused) {
         console.log('Tab blurred, resuming audio');
         this.audioElement.play().catch(e => console.error('Play on blur failed:', e));
@@ -88,6 +89,7 @@ const BackgroundAudio = {
 
     // Also prevent pause when document becomes hidden
     document.addEventListener('visibilitychange', () => {
+      console.log('Visibility change, hidden:', document.hidden, 'isPlaying:', this.isPlaying, 'audio paused:', this.audioElement.paused);
       if (document.hidden && this.isPlaying && this.audioElement.paused) {
         console.log('Document hidden, resuming audio');
         setTimeout(() => {
