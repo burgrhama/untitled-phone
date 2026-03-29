@@ -1725,22 +1725,36 @@ async function addSongs() {
   renderTracks(album);
 }
 
-function playTrack(index) {
+async function playTrack(index) {
   const track = currentAlbumTracks[index];
   const player = document.getElementById("audioPlayer");
+  const nowPlaying = document.getElementById("nowPlaying");
 
-  if (track.url) {
-    player.src = track.url;
-  } else if (track.blob) {
-    player.src = URL.createObjectURL(track.blob);
-  } else {
-    console.error('Track has no source', track);
-    return;
-  }
-
-  player.play();
-  document.getElementById("nowPlaying").innerText = "● " + track.name;
   currentTrackIndex = index;
+  nowPlaying.innerText = "⟳ downloading: " + track.name;
+
+  try {
+    if (track.url && !track.url.startsWith("blob:")) {
+      const response = await fetch(track.url);
+      if (response.ok) {
+        const blob = await response.blob();
+        track.blob = blob;
+        player.src = URL.createObjectURL(blob);
+      } else {
+        throw new Error("Failed to download");
+      }
+    } else if (track.blob) {
+      player.src = URL.createObjectURL(track.blob);
+    } else {
+      throw new Error("No source");
+    }
+
+    player.play();
+    nowPlaying.innerText = "● " + track.name;
+  } catch (err) {
+    console.error("Playback error:", err);
+    nowPlaying.innerText = "⚠ playback failed";
+  }
 }
 
 function playAlbumStart() {
