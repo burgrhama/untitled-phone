@@ -1037,7 +1037,26 @@ if (document.readyState !== 'loading') initBackgroundAudio();
 </div>
 
 <script>
-// ===== AUTHENTICATION =====
+// Check if running as installed PWA
+if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+  console.log('Running as installed PWA - background playback enabled');
+} else {
+  console.log('Running in browser - install PWA for background playback');
+  // Show install message
+  setTimeout(() => {
+    if (!document.querySelector('.pwa-install-msg')) {
+      const msg = document.createElement('div');
+      msg.className = 'pwa-install-msg';
+      msg.innerHTML = `
+        <div style="position: fixed; bottom: 20px; left: 20px; right: 20px; background: rgba(0,0,0,0.9); color: white; padding: 15px; border-radius: 10px; font-size: 14px; z-index: 10000; border: 1px solid rgba(255,255,255,0.2);">
+          📱 Install this app for background music playback!
+          <button onclick="this.parentElement.remove()" style="float: right; background: none; border: none; color: white; font-size: 18px;">×</button>
+        </div>
+      `;
+      document.body.appendChild(msg);
+    }
+  }, 2000);
+}
 
 async function handleLogin() {
   const email = document.getElementById('authEmail').value;
