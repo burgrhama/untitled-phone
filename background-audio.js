@@ -1,6 +1,6 @@
-// ===== PERSISTENT BACKGROUND AUDIO PLAYBACK =====
-// Keeps audio playing even when browser tab loses focus
-// Uses simple blur/visibility detection without interfering with audio routing
+// ===== PERSISTENT BACKGROUND AUDIO - NO WEB AUDIO INTERFERENCE =====
+// Keeps audio playing when tab loses focus
+// DOES NOT use Web Audio API (to avoid breaking native audio output)
 
 const BackgroundAudio = {
   audioElement: null,
@@ -9,24 +9,25 @@ const BackgroundAudio = {
   
   init(audioElement) {
     this.audioElement = audioElement;
+    // Don't create Web Audio context - let native HTML5 audio handle output
     this.setupPlaybackHandlers();
     this.setupVisibilityHandlers();
     this.setupMediaSession();
     this.preventPauseOnBlur();
-    console.log('Persistent background audio initialized');
+    console.log('Background audio initialized (NO Web Audio API interference)');
   },
 
   // Track playback state
   setupPlaybackHandlers() {
     this.audioElement.addEventListener('play', () => {
       this.isPlaying = true;
-      console.log('Audio started playing');
+      console.log('✓ Audio started playing');
       this.ensurePlayback();
     });
 
     this.audioElement.addEventListener('pause', () => {
       this.isPlaying = false;
-      console.log('Audio paused');
+      console.log('⊘ Audio paused');
       if (this.playCheckInterval) {
         clearInterval(this.playCheckInterval);
       }
@@ -34,10 +35,15 @@ const BackgroundAudio = {
 
     this.audioElement.addEventListener('ended', () => {
       this.isPlaying = false;
-      console.log('Audio ended');
+      console.log('✓ Audio ended');
       if (this.playCheckInterval) {
         clearInterval(this.playCheckInterval);
       }
+    });
+
+    this.audioElement.addEventListener('error', (e) => {
+      console.error('✗ Audio error:', e.error);
+      this.isPlaying = false;
     });
   },
 
@@ -45,7 +51,7 @@ const BackgroundAudio = {
   preventPauseOnBlur() {
     window.addEventListener('blur', () => {
       if (this.isPlaying && this.audioElement.paused) {
-        console.log('Tab blurred, resuming audio');
+        console.log('📱 Tab blurred, resuming audio');
         this.audioElement.play().catch(e => console.error('Play on blur failed:', e));
       }
     });
@@ -53,9 +59,9 @@ const BackgroundAudio = {
     // Handle page visibility
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        console.log('Document hidden');
+        console.log('📱 Document hidden');
       } else if (this.isPlaying && this.audioElement.paused) {
-        console.log('Document visible, resuming if paused');
+        console.log('📱 Document visible, resuming if paused');
         this.audioElement.play().catch(e => console.error('Play on visibility failed:', e));
       }
     });
@@ -75,7 +81,7 @@ const BackgroundAudio = {
 
       // If should be playing but isn't, resume
       if (this.audioElement.paused && this.isPlaying) {
-        console.log('Audio paused unexpectedly, resuming');
+        console.log('🔊 Audio paused unexpectedly, resuming');
         this.audioElement.play().catch(e => {
           console.error('Resume failed:', e);
         });
@@ -129,9 +135,9 @@ const BackgroundAudio = {
     document.addEventListener('visibilitychange', () => {
       if (this.isPlaying) {
         if (document.hidden) {
-          console.log('App backgrounded, maintaining playback');
+          console.log('📱 App backgrounded, maintaining playback');
         } else {
-          console.log('App foregrounded');
+          console.log('📱 App foregrounded');
         }
       }
     });
@@ -164,7 +170,7 @@ const BackgroundAudio = {
     }
 
     if (this.audioElement.paused) {
-      console.log('Forcing audio to play');
+      console.log('🔊 Forcing audio to play');
       this.audioElement.play().catch(e => {
         console.error('Force play failed:', e);
       });
@@ -172,7 +178,4 @@ const BackgroundAudio = {
   }
 };
 
-// Export for use in main script
-if (typeof module !== 'undefined' && module.exports) {
-  module.exports = BackgroundAudio;
-}
+console.log('🎵 Background audio module loaded');
