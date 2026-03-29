@@ -1016,8 +1016,22 @@ function initBackgroundAudio() {
     setTimeout(initBackgroundAudio, 100);
   }
 }
-document.addEventListener('DOMContentLoaded', initBackgroundAudio);
-if (document.readyState !== 'loading') initBackgroundAudio();
+document.addEventListener('DOMContentLoaded', () => {
+  const audio = document.getElementById("audioPlayer");
+  if (audio) {
+    audio.volume = 1; // Ensure volume is maxed
+    audio.muted = false; // Ensure not muted
+  }
+  initBackgroundAudio();
+});
+if (document.readyState !== 'loading') {
+  const audio = document.getElementById("audioPlayer");
+  if (audio) {
+    audio.volume = 1;
+    audio.muted = false;
+  }
+  initBackgroundAudio();
+}
 </script>
 </div>
 
@@ -1897,11 +1911,23 @@ function connectAudioAnalyser() {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     analyser = audioContext.createAnalyser();
     analyser.fftSize = 64;
-    source = audioContext.createMediaElementSource(audioPlayer);
-    source.connect(analyser);
-    analyser.connect(audioContext.destination);
+    
+    try {
+      // Only create MediaElementAudioSource if not already created
+      if (!source) {
+        source = audioContext.createMediaElementSource(audioPlayer);
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+      }
+    } catch (e) {
+      // MediaElementAudioSource already created, just use analyser
+      console.log('MediaElementAudioSource already exists, reusing');
+    }
+    
+    console.log('Web Audio API connected, audio element should output normally');
   } catch (e) {
-    console.warn('Web Audio API not available');
+    console.warn('Web Audio API not available, using native audio:', e);
+    analyser = null; // Disable analyser if Web Audio fails
   }
 }
 audioPlayer.addEventListener('play', () => {
@@ -1914,15 +1940,25 @@ audioPlayer.addEventListener('play', () => {
 
 function animate() {
   if (!width || !height) return;
+  
+  // Skip frequency analysis if analyser not available
+  if (!analyser) {
+    rawLevel = 0;
+  } else {
 
   let rawLevel = 0;
-  if (analyser) {
-    const data = new Uint8Array(analyser.frequencyBinCount);
-    analyser.getByteFrequencyData(data);
-    let sum = 0;
-    for (let i = 0; i < data.length; i++) sum += data[i];
-    rawLevel = sum / (data.length * 255);
+  if (analyser && analyser.frequencyBinCount) {
+    try {
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(data);
+      let sum = 0;
+      for (let i = 0; i < data.length; i++) sum += data[i];
+      rawLevel = sum / (data.length * 255);
+    } catch (e) {
+      rawLevel = 0;
+    }
   }
+}
 
   let pushFactor = reactivityFactor * 0.0018;
   let pushLevel = rawLevel * pushFactor;
