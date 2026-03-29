@@ -12,6 +12,7 @@
 <link rel="icon" type="image/png" href="/icon-192.png" sizes="192x192">
 <link rel="icon" type="image/png" href="/icon-512.png" sizes="512x512">
 <link rel="apple-touch-icon" href="/icon-192.png">
+<script src="/background-audio.js"></script>
 <title>pirated untitled · drag to reorder</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -1004,6 +1005,7 @@
 <div class="player">
 <div id="nowPlaying">⚬ no track playing</div>
 <audio id="audioPlayer" controls style="width:100%; margin-top:8px;"></audio>
+<script>if(window.BackgroundAudio) BackgroundAudio.init(document.getElementById("audioPlayer")); BackgroundAudio?.setupIOSAudioHandling();</script>
 </div>
 
 <!-- CUSTOMIZATION PANEL -->
@@ -1751,6 +1753,7 @@ async function playTrack(index) {
 
     player.play();
     nowPlaying.innerText = "● " + track.name;
+    if(window.BackgroundAudio) BackgroundAudio.updateMediaSession(track.name);
   } catch (err) {
     console.error("Playback error:", err);
     nowPlaying.innerText = "⚠ playback failed";

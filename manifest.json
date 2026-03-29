@@ -36,5 +36,19 @@
       "type": "image/png",
       "form_factor": "narrow"
     }
-  ]
+  ],
+  "prefer_related_applications": false,
+  "share_target": {
+    "action": "/",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "files": [
+        {
+          "name": "track",
+          "accept": ["audio/*"]
+        }
+      ]
+    }
+  }
 }

@@ -1,11 +1,12 @@
-const CACHE_NAME = 'pirated-untitled-v2';
+const CACHE_NAME = 'pirated-untitled-v3';
 const AUDIO_CACHE = 'pirated-untitled-audio-v1';
 const URLS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icon-192.png',
-  '/icon-512.png'
+  '/icon-512.png',
+  '/background-audio.js'
 ];
 
 // Install event - cache files
@@ -50,7 +51,7 @@ self.addEventListener('fetch', event => {
   }
 
   // Audio files - cache first, then network (for offline support + fast playback)
-  if (request.url.includes('/uploads/')) {
+  if (request.url.includes('/uploads/') || request.url.includes('data:audio')) {
     event.respondWith(
       caches.match(request).then(response => {
         if (response) {
@@ -93,4 +94,21 @@ self.addEventListener('fetch', event => {
         });
       })
   );
+});
+
+// Background sync for offline queue (future enhancement)
+self.addEventListener('sync', event => {
+  if (event.tag === 'sync-playback-state') {
+    event.waitUntil(
+      // Placeholder for future sync functionality
+      Promise.resolve()
+    );
+  }
+});
+
+// Handle app updates
+self.addEventListener('message', event => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
