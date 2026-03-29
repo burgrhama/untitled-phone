@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iOS Audio Diagnostics</title>
+    <style>
+        body { font-family: system-ui; background: #1a1a1a; color: #0f0; padding: 20px; }
+        .log { background: #0a0a0a; border: 1px solid #0f0; padding: 10px; margin: 10px 0; height: 400px; overflow-y: auto; font-size: 12px; }
+        button { background: #0f0; color: #000; padding: 10px 20px; margin: 5px; cursor: pointer; border: none; border-radius: 5px; }
+        .section { margin: 20px 0; padding: 10px; border: 1px solid #0f0; }
+        .status { font-weight: bold; padding: 10px; background: #0a0a0a; margin: 10px 0; }
+    </style>
+</head>
+<body>
+
+<h1>🍎 iOS Audio Diagnostics</h1>
+
+<div class="section">
+    <h2>Device Info</h2>
+    <div id="deviceInfo" class="status"></div>
+</div>
+
+<div class="section">
+    <h2>Audio Tests</h2>
+    <button onclick="testAudioSupport()">Test Audio Support</button>
+    <button onclick="testWebAudio()">Test Web Audio</button>
+    <button onclick="testMediaSession()">Test Media Session</button>
+    <button onclick="testPlayAudio()">▶ Play Test Audio</button>
+</div>
+
+<div class="section">
+    <h2>Logs</h2>
+    <div id="logs" class="log"></div>
+    <button onclick="clearLogs()">Clear</button>
+</div>
+
+<div style="margin-top: 20px;">
+    <audio id="testAudio" controls crossorigin="anonymous" playsinline webkit-playsinline style="width: 100%;"></audio>
+</div>
+
+<script>
+const logsDiv = document.getElementById('logs');
+let audioContext = null;
+
+function log(msg) {
+    const entry = document.createElement('div');
+    entry.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    logsDiv.appendChild(entry);
+    logsDiv.scrollTop = logsDiv.scrollHeight;
+    console.log(msg);
+}
+
+function clearLogs() {
+    logsDiv.innerHTML = '';
+}
+
+function updateDeviceInfo() {
+    const info = `
+Device: ${navigator.userAgent.substring(0, 50)}...
+Platform: ${navigator.platform}
+Language: ${navigator.language}
+Storage: ${navigator.storage ? 'OK' : 'NO'}
+ServiceWorker: ${navigator.serviceWorker ? 'OK' : 'NO'}
+AudioContext: ${window.AudioContext || window.webkitAudioContext ? 'OK' : 'NO'}
+MediaSession: ${navigator.mediaSession ? 'OK' : 'NO'}
+PWA Mode: ${window.matchMedia('(display-mode: standalone)').matches ? 'YES' : 'NO'}
+    `;
+    document.getElementById('deviceInfo').textContent = info;
+}
+
+function testAudioSupport() {
+    log('Testing audio support...');
+    
+    const audio = document.getElementById('testAudio');
+    log(`Audio element: ${audio ? 'OK' : 'FAIL'}`);
+    log(`Can play mp3: ${audio.canPlayType('audio/mpeg')}`);
+    log(`Can play wav: ${audio.canPlayType('audio/wav')}`);
+    log(`Can play ogg: ${audio.canPlayType('audio/ogg')}`);
+}
+
+function testWebAudio() {
+    log('Testing Web Audio API...');
+    
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) {
+        log('❌ Web Audio API not supported');
+        return;
+    }
+    
+    try {
+        audioContext = new AudioContext();
+        log(`✓ Audio context created: ${audioContext.state}`);
+        log(`Sample rate: ${audioContext.sampleRate}`);
+        
+        // Try to connect audio element
+        const audio = document.getElementById('testAudio');
+        const source = audioContext.createMediaElementAudioSource(audio);
+        source.connect(audioContext.destination);
+        
+        log('✓ Media element source connected');
+        
+    } catch (e) {
+        log(`❌ Error: ${e.message}`);
+    }
+}
+
+function testMediaSession() {
+    log('Testing Media Session API...');
+    
+    if (!navigator.mediaSession) {
+        log('❌ Media Session not supported');
+        return;
+    }
+    
+    log('✓ Media Session supported');
+    
+    navigator.mediaSession.setActionHandler('play', () => {
+        log('📲 Play pressed on lock screen');
+        document.getElementById('testAudio').play();
+    });
+    
+    navigator.mediaSession.setActionHandler('pause', () => {
+        log('📲 Pause pressed on lock screen');
+        document.getElementById('testAudio').pause();
+    });
+    
+    log('✓ Lock screen controls set up');
+}
+
+function testPlayAudio() {
+    log('Testing audio playback...');
+    
+    const audio = document.getElementById('testAudio');
+    
+    // Create a simple test tone
+    if (!audio.src || audio.src.includes('blob')) {
+        log('Creating test audio tone...');
+        
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        oscillator.connect(gain);
+        gain.connect(audioCtx.destination);
+        
+        oscillator.frequency.value = 440; // A4
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1);
+        
+        oscillator.start(audioCtx.currentTime);
+        oscillator.stop(audioCtx.currentTime + 1);
+        
+        log('✓ Test tone playing (1 second)');
+    } else {
+        log('Playing audio from URL...');
+        audio.muted = false;
+        audio.volume = 1;
+        audio.play().then(() => {
+            log('✓ Audio playing');
+        }).catch(e => {
+            log(`❌ Play failed: ${e.message}`);
+        });
+    }
+}
+
+// Initialize
+updateDeviceInfo();
+log('🍎 iOS Audio Diagnostics Ready');
+log('1. Check device info above');
+log('2. Run each test in order');
+log('3. Look for ✓ (pass) or ❌ (fail)');
+
+</script>
+
+</body>
+</html>
