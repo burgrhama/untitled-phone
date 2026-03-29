@@ -1746,30 +1746,31 @@ async function playTrack(index) {
   const nowPlaying = document.getElementById("nowPlaying");
 
   currentTrackIndex = index;
-  nowPlaying.innerText = "⟳ downloading: " + track.name;
+  nowPlaying.innerText = "⟳ loading: " + track.name;
 
   try {
     if (track.url && !track.url.startsWith("blob:")) {
-      const response = await fetch(track.url);
-      if (response.ok) {
-        const blob = await response.blob();
-        track.blob = blob;
-        player.src = URL.createObjectURL(blob);
-      } else {
-        throw new Error("Failed to download");
-      }
+      console.log('Setting player.src to URL:', track.url);
+      player.src = track.url;
     } else if (track.blob) {
+      console.log('Using blob URL for local track');
       player.src = URL.createObjectURL(track.blob);
     } else {
-      throw new Error("No source");
+      throw new Error("No audio source available");
     }
 
-    player.play();
+    // Ensure volume is not muted and set to max
+    player.volume = 1;
+    player.muted = false;
+    console.log('Player volume:', player.volume, 'muted:', player.muted);
+
+    await player.play();
     nowPlaying.innerText = "● " + track.name;
     if(window.BackgroundAudio) BackgroundAudio.updateMediaSession(track.name);
   } catch (err) {
     console.error("Playback error:", err);
-    nowPlaying.innerText = "⚠ playback failed";
+    nowPlaying.innerText = "⚠ playback failed: " + err.message;
+    alert("Playback failed: " + err.message);
   }
 }
 
